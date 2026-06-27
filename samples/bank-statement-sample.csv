@@ -1,0 +1,4 @@
+transaction_date,description,amount,balance,account_masked
+2026-06-01,Salary credit,250000,525000,XXXX1234
+2026-06-05,Home loan EMI,-59770,465230,XXXX1234
+2026-06-10,SIP debit,-13500,451730,XXXX1234

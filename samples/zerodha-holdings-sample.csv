@@ -1,0 +1,3 @@
+symbol,company_name,exchange,quantity,average_buy_price,invested_amount,current_price,current_value,sector,platform
+TCS,Tata Consultancy Services,NSE,20,3200,64000,3900,78000,IT,Zerodha
+HDFCBANK,HDFC Bank,NSE,40,1450,58000,1680,67200,Banking,Zerodha

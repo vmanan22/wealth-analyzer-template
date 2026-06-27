@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum OwnerType {
+  SELF
+  SPOUSE
+  FAMILY
+}
+
+enum AssetClass {
+  MUTUAL_FUND
+  STOCK
+  EPF
+  NPS
+  BANK
+  SAVINGS
+  FIXED_DEPOSIT
+  RECURRING_DEPOSIT
+  GOLD
+  SGB
+  DIGITAL_GOLD
+  GOLD_ETF
+  REAL_ESTATE
+  PHYSICAL_PLOT
+  LIC
+  ULIP
+  PPF
+  BOND
+  ETF
+  PMS
+  AIF
+  ESOP
+  RSU
+  PENSION
+  VEHICLE
+  COMMODITY
+  CRYPTO
+  OTHER
+}
+
+enum LiabilityClass {
+  HOME_LOAN
+  PERSONAL_LOAN
+  CREDIT_CARD
+  CAR_LOAN
+  OTHER
+}
+
+enum LiquidityCategory {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum ImportType {
+  GENERIC_CSV
+  KUVERA
+  CAS
+  ZERODHA
+  BANK
+  EPF
+  NPS
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  DIVIDEND
+  INTEREST
+  CONTRIBUTION
+  PREMIUM
+  EMI
+  ADJUSTMENT
+}
+
+model User {
+  id           String        @id @default(cuid())
+  email        String        @unique
+  name         String
+  passwordHash String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  assets       Asset[]
+  liabilities  Liability[]
+  goals        Goal[]
+  imports      ImportBatch[]
+  auditLogs    AuditLog[]
+}
+
+model Owner {
+  id          String    @id @default(cuid())
+  name        String
+  type        OwnerType
+  assets      Asset[]
+  liabilities Liability[]
+  createdAt   DateTime  @default(now())
+}
+
+model Institution {
+  id          String      @id @default(cuid())
+  name        String
+  type        String
+  assets      Asset[]
+  liabilities Liability[]
+  createdAt   DateTime    @default(now())
+}
+
+model Asset {
+  id                String             @id @default(cuid())
+  userId            String
+  ownerId           String?
+  institutionId     String?
+  ownerType         OwnerType          @default(SELF)
+  assetClass        AssetClass
+  name              String
+  platform          String?
+  investedAmount    Decimal            @db.Decimal(14, 2)
+  currentValue      Decimal            @db.Decimal(14, 2)
+  units             Decimal?           @db.Decimal(18, 6)
+  currentPrice      Decimal?           @db.Decimal(14, 4)
+  purchaseDate      DateTime?
+  contributionDate  DateTime?
+  notes             String?
+  tags              String[]           @default([])
+  liquidity         LiquidityCategory   @default(MEDIUM)
+  taxCategory       String?
+  schemeCategory    String?
+  folioMasked       String?
+  sipAmount         Decimal?           @db.Decimal(12, 2)
+  lockIn            Boolean            @default(false)
+  symbol            String?
+  exchange          String?
+  sector            String?
+  metadata          Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  user              User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner             Owner?             @relation(fields: [ownerId], references: [id])
+  institution       Institution?       @relation(fields: [institutionId], references: [id])
+  snapshots         AssetSnapshot[]
+  transactions      Transaction[]
+
+  @@index([userId, assetClass])
+  @@index([ownerId])
+}
+
+model AssetSnapshot {
+  id           String   @id @default(cuid())
+  assetId      String
+  snapshotDate DateTime
+  investedValue Decimal @db.Decimal(14, 2)
+  currentValue Decimal  @db.Decimal(14, 2)
+  units        Decimal? @db.Decimal(18, 6)
+  price        Decimal? @db.Decimal(14, 4)
+  notes        String?
+  createdAt    DateTime @default(now())
+  asset        Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@unique([assetId, snapshotDate])
+}
+
+model Liability {
+  id                String         @id @default(cuid())
+  userId            String
+  ownerId           String?
+  institutionId     String?
+  ownerType         OwnerType      @default(SELF)
+  liabilityClass    LiabilityClass
+  lender            String
+  name              String
+  originalAmount    Decimal        @db.Decimal(14, 2)
+  outstandingAmount Decimal        @db.Decimal(14, 2)
+  emi               Decimal?       @db.Decimal(12, 2)
+  interestRate      Decimal?       @db.Decimal(6, 3)
+  remainingTenureMonths Int?
+  startDate         DateTime?
+  endDate           DateTime?
+  notes             String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  owner             Owner?         @relation(fields: [ownerId], references: [id])
+  institution       Institution?   @relation(fields: [institutionId], references: [id])
+  snapshots         LiabilitySnapshot[]
+
+  @@index([userId, liabilityClass])
+}
+
+model LiabilitySnapshot {
+  id                String    @id @default(cuid())
+  liabilityId       String
+  snapshotDate      DateTime
+  outstandingAmount Decimal   @db.Decimal(14, 2)
+  notes             String?
+  createdAt         DateTime  @default(now())
+  liability         Liability @relation(fields: [liabilityId], references: [id], onDelete: Cascade)
+
+  @@unique([liabilityId, snapshotDate])
+}
+
+model Transaction {
+  id              String          @id @default(cuid())
+  userId          String
+  assetId         String?
+  transactionDate DateTime
+  assetName       String
+  transactionType TransactionType @default(ADJUSTMENT)
+  amount          Decimal         @db.Decimal(14, 2)
+  units           Decimal?        @db.Decimal(18, 6)
+  price           Decimal?        @db.Decimal(14, 4)
+  sourceHash      String?
+  notes           String?
+  createdAt       DateTime        @default(now())
+  asset           Asset?          @relation(fields: [assetId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, sourceHash])
+  @@index([userId, transactionDate])
+}
+
+model ImportBatch {
+  id             String     @id @default(cuid())
+  userId         String
+  importType     ImportType
+  fileName       String
+  rowCount       Int
+  importedCount  Int        @default(0)
+  duplicateCount Int        @default(0)
+  status         String     @default("PREVIEWED")
+  mapping        Json?
+  createdAt      DateTime   @default(now())
+  user           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Goal {
+  id                       String   @id @default(cuid())
+  userId                   String
+  name                     String
+  targetAmount             Decimal  @db.Decimal(14, 2)
+  targetDate               DateTime?
+  currentMappedAmount      Decimal  @db.Decimal(14, 2) @default(0)
+  expectedReturnPercentage Decimal? @db.Decimal(6, 3)
+  notes                    String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+  user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}

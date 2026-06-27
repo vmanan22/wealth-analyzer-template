@@ -1,0 +1,4 @@
+name,assetClass,ownerType,platform,invested_amount,current_value,transaction_date,liquidity,taxCategory,notes
+Franklin India ELSS Tax Saver Fund,MUTUAL_FUND,SELF,Kuvera,145000,168400,2026-06-01,LOW,ELSS,Seed-style mutual fund row
+Parag Parikh Flexi Cap Fund,MUTUAL_FUND,SELF,Kuvera,161000,137600,2026-06-01,MEDIUM,Equity MF,Seed-style mutual fund row
+Physical Gold,GOLD,SPOUSE,Manual,420000,585000,2026-06-01,MEDIUM,Physical Asset,Manual gold valuation
