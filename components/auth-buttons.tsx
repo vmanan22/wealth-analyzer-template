@@ -37,7 +37,7 @@ export function DemoLoginForm() {
     >
       <input name="email" type="email" defaultValue="demo@wealth.local" aria-label="Email" />
       <input name="password" type="password" defaultValue="password123" aria-label="Password" />
-      <button className="rounded-md bg-leaf px-4 py-3 text-sm font-semibold text-white hover:bg-ink">Open demo workspace</button>
+      <button className="rounded-md bg-leaf px-4 py-3 text-sm font-semibold text-white hover:bg-ink">Sign in with credentials</button>
     </form>
   );
 }

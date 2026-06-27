@@ -1,15 +1,25 @@
 import { redirect } from "next/navigation";
 import { DemoLoginForm, OAuthButtons } from "@/components/auth-buttons";
+import { LocalSignUpForm } from "@/components/local-signup-form";
 import { getCurrentUser } from "@/lib/auth";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams?: Promise<{ signup?: string; email?: string }> }) {
   const user = await getCurrentUser();
   if (user) redirect("/dashboard");
+  const params = await searchParams;
   const enabledProviders = [
     process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? "google" : null,
     process.env.APPLE_CLIENT_ID && process.env.APPLE_CLIENT_SECRET ? "apple" : null,
     process.env.FACEBOOK_CLIENT_ID && process.env.FACEBOOK_CLIENT_SECRET ? "facebook" : null
   ].filter(Boolean) as string[];
+  const signUpMessage =
+    params?.signup === "created"
+      ? `Local user ${params.email ?? ""} created. Sign in with the password you set.`
+      : params?.signup === "exists"
+        ? "That email already exists. Sign in or use a different email."
+        : params?.signup === "invalid"
+          ? "Enter a name, valid email, and password with at least 8 characters."
+          : undefined;
 
   return (
     <main className="min-h-screen bg-[#f7faf7]">
@@ -31,16 +41,17 @@ export default async function LoginPage() {
         </section>
         <section className="rounded-lg border border-stone-200 bg-white p-6 shadow-soft">
           <h2 className="text-2xl font-bold">Sign in</h2>
-          <p className="mt-2 text-sm text-stone-500">Use OAuth in production, or the local demo account while provider secrets are not configured.</p>
+          <p className="mt-2 text-sm text-stone-500">Use OAuth in production, or sign in with local credentials while provider secrets are not configured.</p>
           <div className="mt-6">
             <OAuthButtons enabledProviders={enabledProviders} />
           </div>
           <div className="my-5 flex items-center gap-3">
             <div className="h-px flex-1 bg-stone-200" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">Local demo</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-stone-400">Local credentials</span>
             <div className="h-px flex-1 bg-stone-200" />
           </div>
           <DemoLoginForm />
+          <LocalSignUpForm message={signUpMessage} />
         </section>
       </div>
     </main>

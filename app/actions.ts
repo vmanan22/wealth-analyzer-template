@@ -8,7 +8,7 @@ import { ensureDefaultDataSources } from "@/lib/data-console";
 import { syncCasCsv } from "@/lib/integrations/kuvera";
 import { syncZerodhaCsv } from "@/lib/integrations/zerodha";
 import { prisma } from "@/lib/prisma";
-import { requireUserId } from "@/lib/auth";
+import { hashPassword, requireUserId } from "@/lib/auth";
 import { parseCsv, parseMoney, rowHash } from "@/lib/csv";
 import { buildMonthlyReportContent } from "@/lib/reporting";
 
@@ -24,6 +24,47 @@ function formNumber(formData: FormData, key: string) {
 
 function optionalDate(value: string) {
   return value ? new Date(value) : undefined;
+}
+
+export async function createLocalUser(formData: FormData) {
+  const name = formString(formData, "name");
+  const email = formString(formData, "email").toLowerCase();
+  const password = formString(formData, "password");
+
+  if (!name || !email || password.length < 8) {
+    redirect("/login?signup=invalid");
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  if (existingUser) {
+    redirect("/login?signup=exists");
+  }
+
+  const user = await prisma.user.create({
+    data: {
+      name,
+      email,
+      passwordHash: await hashPassword(password),
+      owners: {
+        create: [
+          { name: "Self", type: "SELF" },
+          { name: "Spouse", type: "SPOUSE" },
+          { name: "Family", type: "FAMILY" }
+        ]
+      },
+      institutions: {
+        create: [
+          { name: "Manual", type: "MANUAL" },
+          { name: "Bank", type: "BANK" },
+          { name: "Broker", type: "BROKER" }
+        ]
+      }
+    }
+  });
+
+  await ensureDefaultDataSources(user.id);
+  await prisma.auditLog.create({ data: { userId: user.id, action: "CREATE_LOCAL_USER", entityType: "User", entityId: user.id } });
+  redirect(`/login?signup=created&email=${encodeURIComponent(email)}`);
 }
 
 export async function createAsset(formData: FormData) {

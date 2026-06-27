@@ -3,14 +3,17 @@ import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient();
 
+type PortfolioVariant = "personal" | "demo";
+
 const monthAgo = (months: number) => {
   const date = new Date();
   date.setDate(1);
   date.setMonth(date.getMonth() - months);
+  date.setHours(0, 0, 0, 0);
   return date;
 };
 
-async function main() {
+async function resetDatabase() {
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
   await prisma.verificationToken.deleteMany();
@@ -32,216 +35,277 @@ async function main() {
   await prisma.institution.deleteMany();
   await prisma.owner.deleteMany();
   await prisma.user.deleteMany();
+}
 
-  const user = await prisma.user.create({
+async function seedUser(email: string, name: string, password: string) {
+  return prisma.user.create({
     data: {
-      email: process.env.DEMO_USER_EMAIL ?? "demo@wealth.local",
-      name: "Demo User",
-      passwordHash: await bcrypt.hash(process.env.DEMO_USER_PASSWORD ?? "password123", 12)
+      email,
+      name,
+      passwordHash: await bcrypt.hash(password, 12)
     }
   });
+}
 
+async function seedPortfolio(userId: string, variant: PortfolioVariant) {
+  const isPersonal = variant === "personal";
   const [self, spouse, family] = await Promise.all([
-    prisma.owner.create({ data: { userId: user.id, name: "Self", type: "SELF" } }),
-    prisma.owner.create({ data: { userId: user.id, name: "Spouse", type: "SPOUSE" } }),
-    prisma.owner.create({ data: { userId: user.id, name: "Family", type: "FAMILY" } })
+    prisma.owner.create({ data: { userId, name: "Self", type: "SELF" } }),
+    prisma.owner.create({ data: { userId, name: "Spouse", type: "SPOUSE" } }),
+    prisma.owner.create({ data: { userId, name: "Family", type: "FAMILY" } })
   ]);
 
+  const institutionRows = isPersonal
+    ? [
+        ["Kuvera", "BROKER"],
+        ["Zerodha", "BROKER"],
+        ["EPFO", "RETIREMENT"],
+        ["NPS CRA", "RETIREMENT"],
+        ["HDFC Bank", "BANK"],
+        ["LIC of India", "INSURANCE"],
+        ["Manual", "MANUAL"]
+      ]
+    : [
+        ["Nimbus Mutuals", "BROKER"],
+        ["MockTrade", "BROKER"],
+        ["FutureNest", "RETIREMENT"],
+        ["Civic Pension Desk", "RETIREMENT"],
+        ["Riverbank Demo", "BANK"],
+        ["LifeShield Sandbox", "INSURANCE"],
+        ["Manual Demo", "MANUAL"]
+      ];
+
   const institutions = await Promise.all(
-    [
-      ["Kuvera", "BROKER"],
-      ["Zerodha", "BROKER"],
-      ["EPFO", "RETIREMENT"],
-      ["NPS CRA", "RETIREMENT"],
-      ["HDFC Bank", "BANK"],
-      ["LIC of India", "INSURANCE"],
-      ["Manual", "MANUAL"]
-    ].map(([name, type]) => prisma.institution.create({ data: { userId: user.id, name, type } }))
+    institutionRows.map(([name, type]) => prisma.institution.create({ data: { userId, name, type } }))
   );
   const byName = Object.fromEntries(institutions.map((institution) => [institution.name, institution]));
-
+  const mfInstitution = byName[isPersonal ? "Kuvera" : "Nimbus Mutuals"];
+  const brokerInstitution = byName[isPersonal ? "Zerodha" : "MockTrade"];
+  const retirementInstitution = byName[isPersonal ? "EPFO" : "FutureNest"];
+  const pensionInstitution = byName[isPersonal ? "NPS CRA" : "Civic Pension Desk"];
+  const bankInstitution = byName[isPersonal ? "HDFC Bank" : "Riverbank Demo"];
+  const insuranceInstitution = byName[isPersonal ? "LIC of India" : "LifeShield Sandbox"];
+  const manualInstitution = byName[isPersonal ? "Manual" : "Manual Demo"];
   const assets = await prisma.asset.createManyAndReturn({
     data: [
       {
-        userId: user.id,
+        userId,
         ownerId: self.id,
-        institutionId: byName.Kuvera.id,
+        institutionId: mfInstitution.id,
         ownerType: "SELF",
         assetClass: "MUTUAL_FUND",
-        name: "Sample ELSS Tax Saver Fund",
-        platform: "Kuvera",
-        investedAmount: 150000,
-        currentValue: 174000,
-        units: 824.267,
-        currentPrice: 204.30,
-        sipAmount: 3500,
-        liquidity: "LOW",
-        taxCategory: "ELSS",
-        schemeCategory: "ELSS",
-        folioMasked: "DEMO1234",
-        lockIn: true,
-        tags: ["tax-saving", "equity"]
+        name: isPersonal ? "Manan ELSS Tax Saver Fund" : "Nimbus Balanced Advantage Fund",
+        platform: isPersonal ? "Kuvera" : "Nimbus Mutuals",
+        investedAmount: isPersonal ? 150000 : 73420,
+        currentValue: isPersonal ? 174000 : 81275,
+        units: isPersonal ? 824.267 : 342.119,
+        currentPrice: isPersonal ? 204.3 : 237.56,
+        sipAmount: isPersonal ? 3500 : 1750,
+        liquidity: isPersonal ? "LOW" : "MEDIUM",
+        taxCategory: isPersonal ? "ELSS" : "Hybrid MF",
+        schemeCategory: isPersonal ? "ELSS" : "Balanced Advantage",
+        folioMasked: isPersonal ? "MANAN1234" : "FIC-8421",
+        lockIn: isPersonal,
+        tags: isPersonal ? ["tax-saving", "equity"] : ["sample", "hybrid"]
       },
       {
-        userId: user.id,
+        userId,
         ownerId: self.id,
-        institutionId: byName.Kuvera.id,
+        institutionId: mfInstitution.id,
         ownerType: "SELF",
         assetClass: "MUTUAL_FUND",
-        name: "Sample Flexi Cap Fund",
-        platform: "Kuvera",
-        investedAmount: 175000,
-        currentValue: 198000,
-        units: 1432.918,
-        currentPrice: 96.03,
-        sipAmount: 10000,
+        name: isPersonal ? "Manan Flexi Cap Fund" : "Aurora Overnight Fund",
+        platform: isPersonal ? "Kuvera" : "Nimbus Mutuals",
+        investedAmount: isPersonal ? 175000 : 48250,
+        currentValue: isPersonal ? 198000 : 49380,
+        units: isPersonal ? 1432.918 : 1191.447,
+        currentPrice: isPersonal ? 96.03 : 41.45,
+        sipAmount: isPersonal ? 10000 : 0,
         liquidity: "MEDIUM",
-        taxCategory: "Equity MF",
-        schemeCategory: "Flexi Cap",
-        folioMasked: "DEMO5678",
-        tags: ["equity", "global"]
+        taxCategory: isPersonal ? "Equity MF" : "Debt MF",
+        schemeCategory: isPersonal ? "Flexi Cap" : "Overnight",
+        folioMasked: isPersonal ? "MANAN5678" : "FIC-3197",
+        tags: isPersonal ? ["equity", "long-term"] : ["sample", "cash-management"]
       },
       {
-        userId: user.id,
+        userId,
         ownerId: self.id,
-        institutionId: byName.Zerodha.id,
+        institutionId: brokerInstitution.id,
         ownerType: "SELF",
-        assetClass: "STOCK",
-        name: "Sample Equity Holdings Basket",
-        platform: "Zerodha",
-        investedAmount: 450000,
-        currentValue: 515000,
-        units: 1,
-        currentPrice: 585000,
+        assetClass: isPersonal ? "STOCK" : "ETF",
+        name: isPersonal ? "Manan Direct Equity Basket" : "MockTrade Global ETF Basket",
+        platform: isPersonal ? "Zerodha" : "MockTrade",
+        investedAmount: isPersonal ? 450000 : 92500,
+        currentValue: isPersonal ? 515000 : 87640,
+        units: isPersonal ? 1 : 37,
+        currentPrice: isPersonal ? 515000 : 2368.65,
         liquidity: "HIGH",
-        taxCategory: "Listed Equity",
-        symbol: "BASKET",
-        exchange: "NSE",
-        sector: "Diversified",
-        tags: ["direct-equity"]
+        taxCategory: isPersonal ? "Listed Equity" : "ETF",
+        symbol: isPersonal ? "BASKET" : "MGETF",
+        exchange: isPersonal ? "NSE" : "DEMO",
+        sector: isPersonal ? "Diversified" : "Global Allocation",
+        tags: isPersonal ? ["direct-equity"] : ["sample", "etf"]
       },
       {
-        userId: user.id,
+        userId,
         ownerId: self.id,
-        institutionId: byName.EPFO.id,
+        institutionId: retirementInstitution.id,
         ownerType: "SELF",
-        assetClass: "EPF",
-        name: "Employee Provident Fund",
-        investedAmount: 900000,
-        currentValue: 1125000,
-        sipAmount: 18000,
+        assetClass: isPersonal ? "EPF" : "PPF",
+        name: isPersonal ? "Manan Employee Provident Fund" : "FutureNest Public Savings Ledger",
+        investedAmount: isPersonal ? 900000 : 214000,
+        currentValue: isPersonal ? 1125000 : 236800,
+        sipAmount: isPersonal ? 18000 : 4500,
         liquidity: "LOW",
-        taxCategory: "Retirement",
-        metadata: {
-          employeeContribution: 540000,
-          employerContribution: 540000,
-          eps: 45000,
-          interestRate: 8.25
-        }
+        taxCategory: isPersonal ? "Retirement" : "Small Savings",
+        metadata: isPersonal
+          ? {
+              employeeContribution: 540000,
+              employerContribution: 540000,
+              eps: 45000,
+              interestRate: 8.25
+            }
+          : {
+              accountMasked: "PPF-7712",
+              interestRate: 7.1,
+              sample: true
+            }
       },
       {
-        userId: user.id,
+        userId,
         ownerId: self.id,
-        institutionId: byName["NPS CRA"].id,
+        institutionId: pensionInstitution.id,
         ownerType: "SELF",
-        assetClass: "NPS",
-        name: "NPS Tier I",
-        investedAmount: 250000,
-        currentValue: 330000,
-        sipAmount: 5000,
-        liquidity: "LOW",
-        taxCategory: "Retirement",
-        metadata: {
-          equityAllocation: 65,
-          corporateDebtAllocation: 20,
-          governmentSecuritiesAllocation: 15,
-          pensionFundManager: "HDFC Pension",
-          tierType: "Tier I"
-        }
+        assetClass: isPersonal ? "NPS" : "BOND",
+        name: isPersonal ? "Manan NPS Tier I" : "Civic Pension Desk Bond Ladder",
+        investedAmount: isPersonal ? 250000 : 156000,
+        currentValue: isPersonal ? 330000 : 161900,
+        sipAmount: isPersonal ? 5000 : 0,
+        liquidity: isPersonal ? "LOW" : "MEDIUM",
+        taxCategory: isPersonal ? "Retirement" : "Debt",
+        metadata: isPersonal
+          ? {
+              equityAllocation: 65,
+              corporateDebtAllocation: 20,
+              governmentSecuritiesAllocation: 15,
+              pensionFundManager: "HDFC Pension",
+              tierType: "Tier I"
+            }
+          : {
+              ladderMonths: 24,
+              sample: true
+            }
       },
       {
-        userId: user.id,
+        userId,
         ownerId: family.id,
-        institutionId: byName["HDFC Bank"].id,
+        institutionId: bankInstitution.id,
         ownerType: "FAMILY",
         assetClass: "SAVINGS",
-        name: "Family Savings Accounts",
-        investedAmount: 300000,
-        currentValue: 300000,
+        name: isPersonal ? "Manan Family Savings" : "Riverbank Demo Operating Balance",
+        investedAmount: isPersonal ? 300000 : 42890,
+        currentValue: isPersonal ? 300000 : 42890,
         liquidity: "HIGH",
         taxCategory: "Savings Interest"
       },
       {
-        userId: user.id,
+        userId,
         ownerId: spouse.id,
-        institutionId: byName.Manual.id,
+        institutionId: manualInstitution.id,
         ownerType: "SPOUSE",
-        assetClass: "GOLD",
-        name: "Physical Gold",
-        investedAmount: 280000,
-        currentValue: 360000,
-        units: 45,
-        currentPrice: 8000,
+        assetClass: isPersonal ? "GOLD" : "SGB",
+        name: isPersonal ? "Family Physical Gold" : "Demo Sovereign Gold Bond 2031",
+        investedAmount: isPersonal ? 280000 : 68700,
+        currentValue: isPersonal ? 360000 : 72180,
+        units: isPersonal ? 45 : 12,
+        currentPrice: isPersonal ? 8000 : 6015,
         liquidity: "MEDIUM",
-        taxCategory: "Physical Asset",
-        metadata: { type: "Physical gold", purity: "22K", storage: "Bank locker" }
+        taxCategory: isPersonal ? "Physical Asset" : "SGB",
+        metadata: isPersonal ? { type: "Physical gold", purity: "22K", storage: "Bank locker" } : { series: "Fictional SGB 2031", sample: true }
       },
       {
-        userId: user.id,
+        userId,
         ownerId: family.id,
-        institutionId: byName.Manual.id,
+        institutionId: manualInstitution.id,
         ownerType: "FAMILY",
-        assetClass: "PHYSICAL_PLOT",
-        name: "Sample Residential Plot",
-        investedAmount: 1200000,
-        currentValue: 1750000,
-        liquidity: "LOW",
-        taxCategory: "Real Estate",
-        metadata: {
-          location: "Sample City",
-          ownershipPercentage: 100,
-          valuationDate: new Date().toISOString()
-        }
+        assetClass: isPersonal ? "PHYSICAL_PLOT" : "VEHICLE",
+        name: isPersonal ? "Manan Residential Plot" : "Demo Electric Scooter",
+        investedAmount: isPersonal ? 1200000 : 118000,
+        currentValue: isPersonal ? 1750000 : 83500,
+        liquidity: isPersonal ? "LOW" : "MEDIUM",
+        taxCategory: isPersonal ? "Real Estate" : "Depreciating Asset",
+        metadata: isPersonal
+          ? {
+              location: "Private location masked",
+              ownershipPercentage: 100,
+              valuationDate: new Date().toISOString(),
+              valuationSource: "Manual estimate"
+            }
+          : {
+              registrationMasked: "DEMO-2042",
+              valuationDate: new Date().toISOString(),
+              sample: true
+            }
       },
       {
-        userId: user.id,
+        userId,
         ownerId: self.id,
-        institutionId: byName["LIC of India"].id,
+        institutionId: insuranceInstitution.id,
         ownerType: "SELF",
-        assetClass: "LIC",
-        name: "Sample LIC Endowment Policy",
-        investedAmount: 180000,
-        currentValue: 220000,
-        sipAmount: 5000,
+        assetClass: isPersonal ? "LIC" : "ULIP",
+        name: isPersonal ? "Manan LIC Endowment Policy" : "LifeShield Sandbox Unit Plan",
+        investedAmount: isPersonal ? 180000 : 65500,
+        currentValue: isPersonal ? 220000 : 61240,
+        sipAmount: isPersonal ? 5000 : 1100,
         liquidity: "LOW",
         taxCategory: "Insurance",
-        metadata: {
-          policyMasked: "LIC0000",
-          sumAssured: 750000,
-          premiumFrequency: "Annual",
-          maturityValue: 550000
-        }
+        metadata: isPersonal
+          ? {
+              policyMasked: "LIC-MANAN",
+              sumAssured: 750000,
+              premiumFrequency: "Annual",
+              maturityValue: 550000
+            }
+          : {
+              policyMasked: "SANDBOX-884",
+              sumAssured: 250000,
+              premiumFrequency: "Monthly",
+              sample: true
+            }
+      },
+      {
+        userId,
+        ownerId: self.id,
+        institutionId: bankInstitution.id,
+        ownerType: "SELF",
+        assetClass: isPersonal ? "RECURRING_DEPOSIT" : "FIXED_DEPOSIT",
+        name: isPersonal ? "Manan Monthly RD" : "Riverbank Demo Short FD",
+        investedAmount: isPersonal ? 120000 : 37500,
+        currentValue: isPersonal ? 124500 : 38360,
+        sipAmount: isPersonal ? 10000 : undefined,
+        liquidity: "MEDIUM",
+        taxCategory: "Interest Income"
       }
     ]
   });
 
-  const homeLoan = await prisma.liability.create({
+  const primaryLiability = await prisma.liability.create({
     data: {
-      userId: user.id,
+      userId,
       ownerId: family.id,
-      institutionId: byName["HDFC Bank"].id,
+      institutionId: bankInstitution.id,
       ownerType: "FAMILY",
-      liabilityClass: "HOME_LOAN",
-      lender: "HDFC Bank",
-      name: "Home Loan",
-      originalAmount: 5500000,
-      outstandingAmount: 2500000,
-      emi: 35000,
-      interestRate: 8.55,
-      remainingTenureMonths: 118,
-      startDate: new Date("2019-08-01"),
-      endDate: new Date("2036-06-01"),
-      notes: "Sample housing loan."
+      liabilityClass: isPersonal ? "HOME_LOAN" : "CAR_LOAN",
+      lender: isPersonal ? "HDFC Bank" : "Riverbank Demo",
+      name: isPersonal ? "Manan Home Loan" : "Demo Vehicle Loan",
+      originalAmount: isPersonal ? 5500000 : 420000,
+      outstandingAmount: isPersonal ? 2500000 : 188500,
+      emi: isPersonal ? 35000 : 8900,
+      interestRate: isPersonal ? 8.55 : 11.25,
+      remainingTenureMonths: isPersonal ? 118 : 28,
+      startDate: isPersonal ? new Date("2019-08-01") : new Date("2025-02-01"),
+      endDate: isPersonal ? new Date("2036-06-01") : new Date("2028-05-01"),
+      notes: isPersonal ? "Personal housing loan." : "Fictional demo loan for sample dashboards."
     }
   });
 
@@ -266,29 +330,35 @@ async function main() {
   for (let i = 11; i >= 0; i--) {
     await prisma.liabilitySnapshot.create({
       data: {
-        liabilityId: homeLoan.id,
+        liabilityId: primaryLiability.id,
         snapshotDate: monthAgo(i),
-        outstandingAmount: 2500000 + i * 22000
+        outstandingAmount: Number(primaryLiability.outstandingAmount) + i * (isPersonal ? 22000 : 4200)
       }
     });
   }
 
   await prisma.goal.createMany({
-    data: [
-      { userId: user.id, name: "₹5Cr Net Worth", targetAmount: 50000000, expectedReturnPercentage: 11, targetDate: new Date("2037-03-31") },
-      { userId: user.id, name: "₹10Cr Net Worth", targetAmount: 100000000, expectedReturnPercentage: 11, targetDate: new Date("2043-03-31") },
-      { userId: user.id, name: "₹25Cr Net Worth", targetAmount: 250000000, expectedReturnPercentage: 10, targetDate: new Date("2050-03-31") },
-      { userId: user.id, name: "Home Loan Closure", targetAmount: 2500000, currentMappedAmount: 0, expectedReturnPercentage: 0, targetDate: new Date("2032-03-31") },
-      { userId: user.id, name: "Retirement Corpus", targetAmount: 120000000, expectedReturnPercentage: 10, targetDate: new Date("2048-03-31") },
-      { userId: user.id, name: "Child Education Fund", targetAmount: 15000000, expectedReturnPercentage: 9, targetDate: new Date("2040-03-31") }
-    ]
+    data: isPersonal
+      ? [
+          { userId, name: "5 Cr Net Worth", targetAmount: 50000000, expectedReturnPercentage: 11, targetDate: new Date("2037-03-31") },
+          { userId, name: "10 Cr Net Worth", targetAmount: 100000000, expectedReturnPercentage: 11, targetDate: new Date("2043-03-31") },
+          { userId, name: "25 Cr Net Worth", targetAmount: 250000000, expectedReturnPercentage: 10, targetDate: new Date("2050-03-31") },
+          { userId, name: "Home Loan Closure", targetAmount: 2500000, currentMappedAmount: 0, expectedReturnPercentage: 0, targetDate: new Date("2032-03-31") },
+          { userId, name: "Retirement Corpus", targetAmount: 120000000, expectedReturnPercentage: 10, targetDate: new Date("2048-03-31") },
+          { userId, name: "Child Education Fund", targetAmount: 15000000, expectedReturnPercentage: 9, targetDate: new Date("2040-03-31") }
+        ]
+      : [
+          { userId, name: "Kitchen Renovation", targetAmount: 425000, currentMappedAmount: 60000, expectedReturnPercentage: 5, targetDate: new Date("2028-09-30") },
+          { userId, name: "Sabbatical Fund", targetAmount: 950000, currentMappedAmount: 0, expectedReturnPercentage: 7, targetDate: new Date("2030-12-31") },
+          { userId, name: "Studio Equipment Upgrade", targetAmount: 310000, currentMappedAmount: 0, expectedReturnPercentage: 6, targetDate: new Date("2029-06-30") }
+        ]
   });
 
   await prisma.importBatch.create({
     data: {
-      userId: user.id,
+      userId,
       importType: "GENERIC_CSV",
-      fileName: "sample-assets.csv",
+      fileName: isPersonal ? "manan-local-assets.csv" : "demo-assets.csv",
       rowCount: 3,
       importedCount: 3,
       status: "IMPORTED",
@@ -297,17 +367,20 @@ async function main() {
   });
 
   const dataSources = await Promise.all([
-    prisma.dataSource.create({ data: { userId: user.id, provider: "ZERODHA", name: "Zerodha", authType: "OAUTH", status: "CONFIG_REQUIRED", metadata: { note: "Use Kite Connect OAuth/API tokens or upload holdings CSV." } } }),
-    prisma.dataSource.create({ data: { userId: user.id, provider: "CAS", name: "CAS / CAMS / KFintech / MFCentral", authType: "FILE_UPLOAD", status: "NOT_CONNECTED", metadata: { note: "Upload CAS statement exports; no broker credentials required." } } }),
-    prisma.dataSource.create({ data: { userId: user.id, provider: "NSE", name: "NSE Market Context", authType: "LICENSED_FEED", status: "CONFIG_REQUIRED", metadata: { note: "Use licensed or permitted market feeds. Do not scrape NSE pages." } } }),
-    prisma.dataSource.create({ data: { userId: user.id, provider: "LAND_RECORDS", name: "Land / Real Estate", authType: "MANUAL", status: "NOT_CONNECTED", metadata: { note: "Use manual appraisals, circle rates, state portals, or future valuation providers." } } }),
-    prisma.dataSource.create({ data: { userId: user.id, provider: "ACCOUNT_AGGREGATOR", name: "Account Aggregator", authType: "CONSENT", status: "CONFIG_REQUIRED", metadata: { note: "Future RBI-regulated consent flow for bank/deposit data." } } })
+    prisma.dataSource.create({ data: { userId, provider: "ZERODHA", name: "Zerodha", authType: "OAUTH", status: isPersonal ? "SYNCED" : "CONFIG_REQUIRED", lastSyncAt: isPersonal ? new Date() : undefined, metadata: { note: "Use Kite Connect OAuth/API tokens or upload holdings CSV." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "CAS", name: "CAS / CAMS / KFintech / MFCentral", authType: "FILE_UPLOAD", status: isPersonal ? "SYNCED" : "NOT_CONNECTED", lastSyncAt: isPersonal ? new Date() : undefined, metadata: { note: "Upload CAS statement exports; no broker credentials required." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "NSE", name: "NSE Market Context", authType: "LICENSED_FEED", status: "CONFIG_REQUIRED", metadata: { note: "Use licensed or permitted market feeds. Do not scrape NSE pages." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "LIC", name: "LIC", authType: "FILE_UPLOAD", status: "NOT_CONNECTED", metadata: { note: "Manual or statement upload first. Never store LIC credentials." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "EPFO", name: "EPFO", authType: "FILE_UPLOAD", status: "NOT_CONNECTED", metadata: { note: "Manual/passbook import only. No EPFO website scraping." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "NPS", name: "NPS CRA", authType: "FILE_UPLOAD", status: "NOT_CONNECTED", metadata: { note: "Manual/CRA statement import." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "LAND_RECORDS", name: "Land / Real Estate", authType: "MANUAL", status: "NOT_CONNECTED", metadata: { note: "Use manual appraisals, circle rates, state portals, or future valuation providers." } } }),
+    prisma.dataSource.create({ data: { userId, provider: "ACCOUNT_AGGREGATOR", name: "Account Aggregator", authType: "CONSENT", status: "CONFIG_REQUIRED", metadata: { note: "Future RBI-regulated consent flow for bank/deposit data." } } })
   ]);
 
   await prisma.advisorContextItem.createMany({
     data: [
       {
-        userId: user.id,
+        userId,
         dataSourceId: dataSources[2].id,
         kind: "WARNING",
         title: "NSE real-time feeds require permitted/licensed data",
@@ -318,8 +391,8 @@ async function main() {
         payload: { guidance: "Use broker APIs or licensed vendors; do not scrape NSE pages.", decisionUse: "decision_support_only" }
       },
       {
-        userId: user.id,
-        dataSourceId: dataSources[3].id,
+        userId,
+        dataSourceId: dataSources[6].id,
         kind: "VALUATION_NOTE",
         title: "Land values need manual or licensed valuation",
         source: "Land / Real Estate",
@@ -333,15 +406,36 @@ async function main() {
 
   await prisma.auditLog.create({
     data: {
-      userId: user.id,
-      action: "SEED_DEMO_PORTFOLIO",
+      userId,
+      action: isPersonal ? "SEED_MANAN_PORTFOLIO" : "SEED_DEMO_PORTFOLIO",
       entityType: "User",
-      entityId: user.id,
-      metadata: { source: "prisma/seed.ts" }
+      entityId: userId,
+      metadata: { source: "prisma/seed.ts", variant }
     }
   });
+}
 
-  console.log(`Seeded demo user ${user.email}`);
+async function main() {
+  await resetDatabase();
+
+  const demoUser = await seedUser(
+    process.env.DEMO_USER_EMAIL ?? "demo@wealth.local",
+    "Demo User",
+    process.env.DEMO_USER_PASSWORD ?? "password123"
+  );
+  await seedPortfolio(demoUser.id, "demo");
+
+  if (process.env.SEED_PERSONAL_USER === "true") {
+    const mananUser = await seedUser(
+      process.env.MANAN_USER_EMAIL ?? "manan@wealth.local",
+      "Manan",
+      process.env.MANAN_USER_PASSWORD ?? "manan123"
+    );
+    await seedPortfolio(mananUser.id, "personal");
+    console.log(`Seeded personal user ${mananUser.email}`);
+  }
+
+  console.log(`Seeded demo user ${demoUser.email}`);
 }
 
 main()

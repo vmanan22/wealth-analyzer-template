@@ -46,7 +46,9 @@ For local prototyping before migrations are adopted, `npm run db:push` is also a
 npm run dev
 ```
 
-Open `http://localhost:3000/login`. The local demo account is `demo@wealth.local` / `password123`.
+Open `http://localhost:3000/login`. The presentation-safe demo account is `demo@wealth.local` / `password123`.
+
+For a separate local personal account, set `SEED_PERSONAL_USER="true"` plus `MANAN_USER_EMAIL` and `MANAN_USER_PASSWORD` in `.env`, then run `npm run db:seed`.
 
 ## Docker
 
