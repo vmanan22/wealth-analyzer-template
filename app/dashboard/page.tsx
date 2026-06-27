@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowUpRight, Plus } from "lucide-react";
+import { ArrowUpRight, Brain, FileText, Plus } from "lucide-react";
 import { AllocationPie, GoalBars, NetWorthLine } from "@/components/charts";
 import { Card, PageHeader, StatCard } from "@/components/ui";
 import { getPortfolioData } from "@/lib/data";
@@ -47,6 +47,23 @@ export default async function DashboardPage() {
           value={formatRupees(monthlyOutflowTotal, { compact: true })}
           helper={`${monthlySipAssets.length} SIPs, home loan, LIC, and other investments`}
         />
+      </div>
+
+      <div className="mt-6 grid gap-4 lg:grid-cols-2">
+        <Link href="/advisor" className="rounded-lg border border-stone-200 bg-ink p-5 text-white shadow-soft transition hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <Brain size={22} />
+            <h2 className="text-lg font-bold">AI Portfolio Advisor</h2>
+          </div>
+          <p className="mt-3 text-sm text-white/75">Generate educational recommendations across allocation, liquidity, goals, SIPs, and debt.</p>
+        </Link>
+        <Link href="/reports" className="rounded-lg border border-stone-200 bg-white p-5 shadow-soft transition hover:-translate-y-0.5">
+          <div className="flex items-center gap-3">
+            <FileText size={22} className="text-leaf" />
+            <h2 className="text-lg font-bold">Monthly PDF Reports</h2>
+          </div>
+          <p className="mt-3 text-sm text-stone-500">Create investor-style snapshots with net worth, goals, risks, and advisor commentary.</p>
+        </Link>
       </div>
 
       <Card className="mt-6">

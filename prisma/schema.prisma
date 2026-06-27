@@ -80,35 +80,51 @@ enum TransactionType {
 }
 
 model User {
-  id           String        @id @default(cuid())
-  email        String        @unique
-  name         String
-  passwordHash String
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  assets       Asset[]
-  liabilities  Liability[]
-  goals        Goal[]
-  imports      ImportBatch[]
-  auditLogs    AuditLog[]
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  passwordHash  String?
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  accounts      Account[]
+  sessions      Session[]
+  owners        Owner[]
+  institutions  Institution[]
+  assets        Asset[]
+  liabilities   Liability[]
+  goals         Goal[]
+  imports       ImportBatch[]
+  reports       Report[]
+  aiInsights    AiInsight[]
+  auditLogs     AuditLog[]
 }
 
 model Owner {
   id          String    @id @default(cuid())
+  userId      String
   name        String
   type        OwnerType
   assets      Asset[]
   liabilities Liability[]
   createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Institution {
   id          String      @id @default(cuid())
+  userId      String?
   name        String
   type        String
   assets      Asset[]
   liabilities Liability[]
   createdAt   DateTime    @default(now())
+  user        User?       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model Asset {
@@ -251,6 +267,35 @@ model Goal {
   user                     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model AiInsight {
+  id                    String   @id @default(cuid())
+  userId                String
+  portfolioSnapshotJson Json
+  recommendationsJson   Json
+  riskScore             Int?
+  status                String   @default("COMPLETED")
+  createdAt             DateTime @default(now())
+  user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reports               Report[]
+
+  @@index([userId, createdAt])
+}
+
+model Report {
+  id          String     @id @default(cuid())
+  userId      String
+  aiInsightId String?
+  type        String
+  periodStart DateTime
+  periodEnd   DateTime
+  contentJson Json
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiInsight   AiInsight? @relation(fields: [aiInsightId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+}
+
 model AuditLog {
   id         String   @id @default(cuid())
   userId     String
@@ -262,4 +307,40 @@ model AuditLog {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, createdAt])
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
 }

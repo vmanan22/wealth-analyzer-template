@@ -63,9 +63,10 @@ export async function getPortfolioData() {
 }
 
 export async function getReferenceData() {
+  const userId = await requireUserId();
   const [owners, institutions] = await Promise.all([
-    prisma.owner.findMany({ orderBy: { name: "asc" } }),
-    prisma.institution.findMany({ orderBy: { name: "asc" } })
+    prisma.owner.findMany({ where: { userId }, orderBy: { name: "asc" } }),
+    prisma.institution.findMany({ where: { OR: [{ userId }, { userId: null }] }, orderBy: { name: "asc" } })
   ]);
   return { owners, institutions };
 }

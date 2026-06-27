@@ -1,6 +1,6 @@
 # Wealth Analyzer
 
-Full-stack personal wealth portfolio analyzer for an Indian household. The MVP tracks a complete balance sheet: mutual funds, stocks, EPF, NPS, bank cash, gold, real estate, LIC, goals, liabilities, CSV imports, and monthly snapshots.
+Cloud-portable personal wealth portfolio analyzer for Indian households. The app tracks a complete balance sheet: mutual funds, stocks, EPF, NPS, bank cash, gold, real estate, LIC, goals, liabilities, CSV imports, AI advisor insights, PDF reports, and monthly snapshots.
 
 ## Stack
 
@@ -9,8 +9,11 @@ Full-stack personal wealth portfolio analyzer for an Indian household. The MVP t
 - Prisma ORM
 - PostgreSQL
 - Recharts
-- Local MVP authentication with bcrypt
+- NextAuth/Auth.js OAuth with Google, Apple, Facebook, plus local demo credentials
+- OpenAI API for portfolio analysis
+- PDF report generation
 - Generic CSV importer with duplicate hashing
+- Docker-first deployment for AWS, Azure, and GCP
 
 ## Setup
 
@@ -28,12 +31,14 @@ cp .env.example .env
 
 3. Set `DATABASE_URL` to a PostgreSQL database.
 
-4. Create tables and seed realistic demo data:
+4. Create tables and seed neutral demo data:
 
 ```bash
-npm run db:push
+npm run prisma:deploy
 npm run db:seed
 ```
+
+For local prototyping before migrations are adopted, `npm run db:push` is also available.
 
 5. Start the app:
 
@@ -41,7 +46,16 @@ npm run db:seed
 npm run dev
 ```
 
-Open `http://localhost:3000/dashboard`.
+Open `http://localhost:3000/login`. The local demo account is `demo@wealth.local` / `password123`.
+
+## Docker
+
+```bash
+docker build -t wealth-analyzer .
+docker run --env-file .env -p 3000:3000 wealth-analyzer
+```
+
+Use managed PostgreSQL in production and run `npm run prisma:deploy` before starting the container. See `docs/deployment.md` for AWS, Azure, and GCP notes.
 
 ## MVP Modules
 
@@ -52,6 +66,9 @@ Open `http://localhost:3000/dashboard`.
 - Goal tracker seeded with ₹5Cr, ₹10Cr, ₹25Cr, home loan closure, retirement corpus, and child education.
 - Analytics for owner-level view, debt ratio, emergency fund months, concentration risk, and illiquid percentage.
 - Settings for data export and local data deletion.
+- OAuth login and user-scoped portfolio data.
+- AI advisor page with stored educational recommendations.
+- Monthly reports with PDF download.
 
 ## Sample Imports
 
@@ -66,10 +83,13 @@ The generic importer expects columns such as `name`, `invested_amount`, `current
 ## Privacy And Security
 
 - Passwords are hashed with bcrypt.
+- OAuth sessions are handled by NextAuth/Auth.js.
 - No secrets are exposed to the frontend.
 - No bank, Kuvera, Zerodha, or EPFO passwords are stored or requested.
+- AI analysis excludes credentials and is educational only, not SEBI-registered advice.
 - Future integrations should use OAuth, API tokens, or consent-based Account Aggregator flows.
 - Export and delete-all-user-data controls are included in Settings.
+- Run `npm audit` before deployment; the committed dependency set is expected to report zero vulnerabilities.
 
 ## Future TODOs
 
@@ -80,3 +100,4 @@ The generic importer expects columns such as `name`, `invested_amount`, `current
 - XIRR, CAGR, tax lot, and redeemable amount calculations.
 - Asset-goal mapping table for precise goal allocation.
 - Stronger auth/session management before internet deployment.
+- Object-storage adapter for persisted report PDFs.

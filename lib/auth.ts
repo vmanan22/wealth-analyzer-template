@@ -1,8 +1,8 @@
 import bcrypt from "bcryptjs";
-import { cookies } from "next/headers";
+import { getServerSession } from "next-auth";
+import { redirect } from "next/navigation";
+import { authOptions } from "@/lib/next-auth";
 import { prisma } from "@/lib/prisma";
-
-const COOKIE_NAME = "wealth_user_id";
 
 export async function hashPassword(password: string) {
   return bcrypt.hash(password, 12);
@@ -13,32 +13,16 @@ export async function verifyPassword(password: string, hash: string) {
 }
 
 export async function getCurrentUser() {
-  const cookieStore = await cookies();
-  const userId = cookieStore.get(COOKIE_NAME)?.value;
-
-  if (userId) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    if (user) return user;
-  }
-
-  return prisma.user.findFirst({ orderBy: { createdAt: "asc" } });
+  const session = await getServerSession(authOptions);
+  const userId = session?.user?.id;
+  if (!userId) return null;
+  return prisma.user.findUnique({ where: { id: userId } });
 }
 
 export async function requireUserId() {
   const user = await getCurrentUser();
   if (!user) {
-    throw new Error("No user found. Run `npm run db:seed` first.");
+    redirect("/login");
   }
   return user.id;
-}
-
-export async function setUserSession(userId: string) {
-  const cookieStore = await cookies();
-  cookieStore.set(COOKIE_NAME, userId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: 60 * 60 * 24 * 30
-  });
 }

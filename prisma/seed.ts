@@ -11,7 +11,12 @@ const monthAgo = (months: number) => {
 };
 
 async function main() {
+  await prisma.session.deleteMany();
+  await prisma.account.deleteMany();
+  await prisma.verificationToken.deleteMany();
   await prisma.auditLog.deleteMany();
+  await prisma.report.deleteMany();
+  await prisma.aiInsight.deleteMany();
   await prisma.importBatch.deleteMany();
   await prisma.transaction.deleteMany();
   await prisma.assetSnapshot.deleteMany();
@@ -26,15 +31,15 @@ async function main() {
   const user = await prisma.user.create({
     data: {
       email: process.env.DEMO_USER_EMAIL ?? "demo@wealth.local",
-      name: "Manan Vora",
+      name: "Demo User",
       passwordHash: await bcrypt.hash(process.env.DEMO_USER_PASSWORD ?? "password123", 12)
     }
   });
 
   const [self, spouse, family] = await Promise.all([
-    prisma.owner.create({ data: { name: "Self", type: "SELF" } }),
-    prisma.owner.create({ data: { name: "Spouse", type: "SPOUSE" } }),
-    prisma.owner.create({ data: { name: "Family", type: "FAMILY" } })
+    prisma.owner.create({ data: { userId: user.id, name: "Self", type: "SELF" } }),
+    prisma.owner.create({ data: { userId: user.id, name: "Spouse", type: "SPOUSE" } }),
+    prisma.owner.create({ data: { userId: user.id, name: "Family", type: "FAMILY" } })
   ]);
 
   const institutions = await Promise.all(
@@ -46,7 +51,7 @@ async function main() {
       ["HDFC Bank", "BANK"],
       ["LIC of India", "INSURANCE"],
       ["Manual", "MANUAL"]
-    ].map(([name, type]) => prisma.institution.create({ data: { name, type } }))
+    ].map(([name, type]) => prisma.institution.create({ data: { userId: user.id, name, type } }))
   );
   const byName = Object.fromEntries(institutions.map((institution) => [institution.name, institution]));
 
@@ -58,17 +63,17 @@ async function main() {
         institutionId: byName.Kuvera.id,
         ownerType: "SELF",
         assetClass: "MUTUAL_FUND",
-        name: "Franklin India ELSS Tax Saver Fund",
+        name: "Sample ELSS Tax Saver Fund",
         platform: "Kuvera",
-        investedAmount: 145000,
-        currentValue: 168400,
+        investedAmount: 150000,
+        currentValue: 174000,
         units: 824.267,
         currentPrice: 204.30,
         sipAmount: 3500,
         liquidity: "LOW",
         taxCategory: "ELSS",
         schemeCategory: "ELSS",
-        folioMasked: "FRNK1234",
+        folioMasked: "DEMO1234",
         lockIn: true,
         tags: ["tax-saving", "equity"]
       },
@@ -78,17 +83,17 @@ async function main() {
         institutionId: byName.Kuvera.id,
         ownerType: "SELF",
         assetClass: "MUTUAL_FUND",
-        name: "Parag Parikh Flexi Cap Fund",
+        name: "Sample Flexi Cap Fund",
         platform: "Kuvera",
-        investedAmount: 161000,
-        currentValue: 137600,
+        investedAmount: 175000,
+        currentValue: 198000,
         units: 1432.918,
         currentPrice: 96.03,
         sipAmount: 10000,
         liquidity: "MEDIUM",
         taxCategory: "Equity MF",
         schemeCategory: "Flexi Cap",
-        folioMasked: "PPFC5678",
+        folioMasked: "DEMO5678",
         tags: ["equity", "global"]
       },
       {
@@ -97,10 +102,10 @@ async function main() {
         institutionId: byName.Zerodha.id,
         ownerType: "SELF",
         assetClass: "STOCK",
-        name: "Zerodha Equity Holdings Basket",
+        name: "Sample Equity Holdings Basket",
         platform: "Zerodha",
-        investedAmount: 520000,
-        currentValue: 585000,
+        investedAmount: 450000,
+        currentValue: 515000,
         units: 1,
         currentPrice: 585000,
         liquidity: "HIGH",
@@ -117,15 +122,15 @@ async function main() {
         ownerType: "SELF",
         assetClass: "EPF",
         name: "Employee Provident Fund",
-        investedAmount: 1900000,
-        currentValue: 2291093,
-        sipAmount: 24000,
+        investedAmount: 900000,
+        currentValue: 1125000,
+        sipAmount: 18000,
         liquidity: "LOW",
         taxCategory: "Retirement",
         metadata: {
-          employeeContribution: 1150000,
-          employerContribution: 760000,
-          eps: 81093,
+          employeeContribution: 540000,
+          employerContribution: 540000,
+          eps: 45000,
           interestRate: 8.25
         }
       },
@@ -136,8 +141,8 @@ async function main() {
         ownerType: "SELF",
         assetClass: "NPS",
         name: "NPS Tier I",
-        investedAmount: 350000,
-        currentValue: 484080.73,
+        investedAmount: 250000,
+        currentValue: 330000,
         sipAmount: 5000,
         liquidity: "LOW",
         taxCategory: "Retirement",
@@ -156,8 +161,8 @@ async function main() {
         ownerType: "FAMILY",
         assetClass: "SAVINGS",
         name: "Family Savings Accounts",
-        investedAmount: 275000,
-        currentValue: 275000,
+        investedAmount: 300000,
+        currentValue: 300000,
         liquidity: "HIGH",
         taxCategory: "Savings Interest"
       },
@@ -168,10 +173,10 @@ async function main() {
         ownerType: "SPOUSE",
         assetClass: "GOLD",
         name: "Physical Gold",
-        investedAmount: 420000,
-        currentValue: 585000,
-        units: 70,
-        currentPrice: 8357,
+        investedAmount: 280000,
+        currentValue: 360000,
+        units: 45,
+        currentPrice: 8000,
         liquidity: "MEDIUM",
         taxCategory: "Physical Asset",
         metadata: { type: "Physical gold", purity: "22K", storage: "Bank locker" }
@@ -182,13 +187,13 @@ async function main() {
         institutionId: byName.Manual.id,
         ownerType: "FAMILY",
         assetClass: "PHYSICAL_PLOT",
-        name: "Family Plot",
-        investedAmount: 1800000,
-        currentValue: 3000000,
+        name: "Sample Residential Plot",
+        investedAmount: 1200000,
+        currentValue: 1750000,
         liquidity: "LOW",
         taxCategory: "Real Estate",
         metadata: {
-          location: "Gujarat",
+          location: "Sample City",
           ownershipPercentage: 100,
           valuationDate: new Date().toISOString()
         }
@@ -199,17 +204,17 @@ async function main() {
         institutionId: byName["LIC of India"].id,
         ownerType: "SELF",
         assetClass: "LIC",
-        name: "LIC Endowment Policy",
-        investedAmount: 260000,
-        currentValue: 315000,
-        sipAmount: 6500,
+        name: "Sample LIC Endowment Policy",
+        investedAmount: 180000,
+        currentValue: 220000,
+        sipAmount: 5000,
         liquidity: "LOW",
         taxCategory: "Insurance",
         metadata: {
-          policyMasked: "LIC9876",
-          sumAssured: 1000000,
+          policyMasked: "LIC0000",
+          sumAssured: 750000,
           premiumFrequency: "Annual",
-          maturityValue: 750000
+          maturityValue: 550000
         }
       }
     ]
@@ -225,13 +230,13 @@ async function main() {
       lender: "HDFC Bank",
       name: "Home Loan",
       originalAmount: 5500000,
-      outstandingAmount: 3939000,
-      emi: 59770,
+      outstandingAmount: 2500000,
+      emi: 35000,
       interestRate: 8.55,
       remainingTenureMonths: 118,
       startDate: new Date("2019-08-01"),
       endDate: new Date("2036-06-01"),
-      notes: "Primary family housing loan."
+      notes: "Sample housing loan."
     }
   });
 
@@ -258,7 +263,7 @@ async function main() {
       data: {
         liabilityId: homeLoan.id,
         snapshotDate: monthAgo(i),
-        outstandingAmount: 3939000 + i * 38500
+        outstandingAmount: 2500000 + i * 22000
       }
     });
   }
@@ -268,7 +273,7 @@ async function main() {
       { userId: user.id, name: "₹5Cr Net Worth", targetAmount: 50000000, expectedReturnPercentage: 11, targetDate: new Date("2037-03-31") },
       { userId: user.id, name: "₹10Cr Net Worth", targetAmount: 100000000, expectedReturnPercentage: 11, targetDate: new Date("2043-03-31") },
       { userId: user.id, name: "₹25Cr Net Worth", targetAmount: 250000000, expectedReturnPercentage: 10, targetDate: new Date("2050-03-31") },
-      { userId: user.id, name: "Home Loan Closure", targetAmount: 3939000, currentMappedAmount: 0, expectedReturnPercentage: 0, targetDate: new Date("2032-03-31") },
+      { userId: user.id, name: "Home Loan Closure", targetAmount: 2500000, currentMappedAmount: 0, expectedReturnPercentage: 0, targetDate: new Date("2032-03-31") },
       { userId: user.id, name: "Retirement Corpus", targetAmount: 120000000, expectedReturnPercentage: 10, targetDate: new Date("2048-03-31") },
       { userId: user.id, name: "Child Education Fund", targetAmount: 15000000, expectedReturnPercentage: 9, targetDate: new Date("2040-03-31") }
     ]

@@ -1,11 +1,13 @@
 "use server";
 
-import { AssetClass, LiabilityClass, LiquidityCategory, OwnerType } from "@prisma/client";
+import { AssetClass, LiabilityClass, LiquidityCategory, OwnerType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { generateAdvisorResult } from "@/lib/advisor";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
 import { parseCsv, parseMoney, rowHash } from "@/lib/csv";
+import { buildMonthlyReportContent } from "@/lib/reporting";
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -205,4 +207,41 @@ export async function deleteAllUserData() {
   const userId = await requireUserId();
   await prisma.user.delete({ where: { id: userId } });
   redirect("/dashboard");
+}
+
+export async function generateAdvisorInsight() {
+  const userId = await requireUserId();
+  const { payload, result, status } = await generateAdvisorResult();
+  await prisma.aiInsight.create({
+    data: {
+      userId,
+      portfolioSnapshotJson: payload,
+      recommendationsJson: result,
+      riskScore: result.riskScore,
+      status
+    }
+  });
+  await prisma.auditLog.create({ data: { userId, action: "GENERATE_AI_INSIGHT", entityType: "AiInsight", metadata: { status, riskScore: result.riskScore } } });
+  revalidatePath("/advisor");
+  revalidatePath("/dashboard");
+  redirect("/advisor");
+}
+
+export async function createMonthlyReport() {
+  const userId = await requireUserId();
+  const latestInsight = await prisma.aiInsight.findFirst({ where: { userId }, orderBy: { createdAt: "desc" } });
+  const report = await buildMonthlyReportContent(latestInsight);
+  await prisma.report.create({
+    data: {
+      userId,
+      aiInsightId: latestInsight?.id,
+      type: "MONTHLY",
+      periodStart: report.periodStart,
+      periodEnd: report.periodEnd,
+      contentJson: JSON.parse(JSON.stringify(report.content)) as Prisma.InputJsonValue
+    }
+  });
+  await prisma.auditLog.create({ data: { userId, action: "CREATE_MONTHLY_REPORT", entityType: "Report", metadata: { type: "MONTHLY" } } });
+  revalidatePath("/reports");
+  redirect("/reports");
 }

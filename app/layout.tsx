@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { BarChart3, Landmark, LineChart, PiggyBank, Settings, ShieldCheck, Target, Upload, WalletCards } from "lucide-react";
+import { BarChart3, Brain, FileText, Landmark, LineChart, PiggyBank, Settings, ShieldCheck, Target, Upload, WalletCards } from "lucide-react";
 import Link from "next/link";
+import { SignOutButton } from "@/components/auth-buttons";
+import { getCurrentUser } from "@/lib/auth";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -15,14 +17,19 @@ const nav = [
   { href: "/imports", label: "Imports", icon: Upload },
   { href: "/snapshots", label: "Snapshots", icon: LineChart },
   { href: "/goals", label: "Goals", icon: Target },
+  { href: "/advisor", label: "Advisor", icon: Brain },
+  { href: "/reports", label: "Reports", icon: FileText },
   { href: "/analytics", label: "Analytics", icon: PiggyBank },
   { href: "/settings", label: "Settings", icon: Settings }
 ];
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const user = await getCurrentUser();
+
   return (
     <html lang="en">
       <body>
+        {!user ? children : (
         <div className="flex min-h-screen">
           <aside className="hidden w-64 border-r border-stone-200 bg-white/85 px-4 py-5 backdrop-blur lg:block">
             <Link href="/dashboard" className="mb-7 flex items-center gap-3">
@@ -49,6 +56,12 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 );
               })}
             </nav>
+            {user ? (
+              <div className="mt-8 border-t border-stone-200 pt-4">
+                <p className="mb-2 truncate px-3 text-xs text-stone-500">{user.email}</p>
+                <SignOutButton />
+              </div>
+            ) : null}
           </aside>
           <main className="min-w-0 flex-1">
             <div className="border-b border-stone-200 bg-white/75 px-4 py-3 backdrop-blur lg:hidden">
@@ -63,6 +76,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
             {children}
           </main>
         </div>
+        )}
       </body>
     </html>
   );

@@ -1,4 +1,5 @@
 import { Asset, AssetClass, Liability } from "@prisma/client";
+import { formatAssetClass } from "@/lib/asset-options";
 import { toNumber } from "@/lib/format";
 
 export type AssetWithNumbers = Asset & {
@@ -37,7 +38,7 @@ export function assetAllocation(assets: AssetWithNumbers[]) {
   for (const asset of assets) {
     grouped.set(asset.assetClass, (grouped.get(asset.assetClass) ?? 0) + toNumber(asset.currentValue));
   }
-  return Array.from(grouped.entries()).map(([name, value]) => ({ name, value }));
+  return Array.from(grouped.entries()).map(([name, value]) => ({ name: formatAssetClass(name), value }));
 }
 
 export function ownerAllocation(assets: AssetWithNumbers[]) {

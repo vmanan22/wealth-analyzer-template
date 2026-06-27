@@ -14,7 +14,7 @@ export function PageHeader({ title, eyebrow, children }: { title: string; eyebro
 }
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={clsx("rounded-lg border border-stone-200 bg-white p-5 shadow-soft", className)}>{children}</section>;
+  return <section className={clsx("rounded-lg border border-stone-200 bg-white/95 p-5 shadow-soft", className)}>{children}</section>;
 }
 
 export function StatCard({ label, value, helper, tone = "default" }: { label: string; value: string; helper?: string; tone?: "default" | "good" | "warn" | "bad" }) {
@@ -35,7 +35,7 @@ export function StatCard({ label, value, helper, tone = "default" }: { label: st
 }
 
 export function PrimaryButton({ children }: { children: ReactNode }) {
-  return <button className="inline-flex items-center justify-center rounded-md bg-leaf px-4 py-2 text-sm font-semibold text-white hover:bg-ink">{children}</button>;
+  return <button className="inline-flex items-center justify-center rounded-md bg-leaf px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-ink">{children}</button>;
 }
 
 export function SecondaryLink({ href, children }: { href: string; children: ReactNode }) {
