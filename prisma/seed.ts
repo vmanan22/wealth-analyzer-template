@@ -94,7 +94,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: mfInstitution.id,
         ownerType: "SELF",
         assetClass: "MUTUAL_FUND",
-        name: isPersonal ? "Manan ELSS Tax Saver Fund" : "Nimbus Balanced Advantage Fund",
+        name: isPersonal ? "Personal ELSS Tax Saver Fund" : "Nimbus Balanced Advantage Fund",
         platform: isPersonal ? "Kuvera" : "Nimbus Mutuals",
         investedAmount: isPersonal ? 150000 : 73420,
         currentValue: isPersonal ? 174000 : 81275,
@@ -104,7 +104,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         liquidity: isPersonal ? "LOW" : "MEDIUM",
         taxCategory: isPersonal ? "ELSS" : "Hybrid MF",
         schemeCategory: isPersonal ? "ELSS" : "Balanced Advantage",
-        folioMasked: isPersonal ? "MANAN1234" : "FIC-8421",
+        folioMasked: isPersonal ? "PERSONAL1234" : "FIC-8421",
         lockIn: isPersonal,
         tags: isPersonal ? ["tax-saving", "equity"] : ["sample", "hybrid"]
       },
@@ -114,7 +114,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: mfInstitution.id,
         ownerType: "SELF",
         assetClass: "MUTUAL_FUND",
-        name: isPersonal ? "Manan Flexi Cap Fund" : "Aurora Overnight Fund",
+        name: isPersonal ? "Personal Flexi Cap Fund" : "Aurora Overnight Fund",
         platform: isPersonal ? "Kuvera" : "Nimbus Mutuals",
         investedAmount: isPersonal ? 175000 : 48250,
         currentValue: isPersonal ? 198000 : 49380,
@@ -124,7 +124,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         liquidity: "MEDIUM",
         taxCategory: isPersonal ? "Equity MF" : "Debt MF",
         schemeCategory: isPersonal ? "Flexi Cap" : "Overnight",
-        folioMasked: isPersonal ? "MANAN5678" : "FIC-3197",
+        folioMasked: isPersonal ? "PERSONAL5678" : "FIC-3197",
         tags: isPersonal ? ["equity", "long-term"] : ["sample", "cash-management"]
       },
       {
@@ -133,7 +133,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: brokerInstitution.id,
         ownerType: "SELF",
         assetClass: isPersonal ? "STOCK" : "ETF",
-        name: isPersonal ? "Manan Direct Equity Basket" : "MockTrade Global ETF Basket",
+        name: isPersonal ? "Personal Direct Equity Basket" : "MockTrade Global ETF Basket",
         platform: isPersonal ? "Zerodha" : "MockTrade",
         investedAmount: isPersonal ? 450000 : 92500,
         currentValue: isPersonal ? 515000 : 87640,
@@ -152,7 +152,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: retirementInstitution.id,
         ownerType: "SELF",
         assetClass: isPersonal ? "EPF" : "PPF",
-        name: isPersonal ? "Manan Employee Provident Fund" : "FutureNest Public Savings Ledger",
+        name: isPersonal ? "Personal Employee Provident Fund" : "FutureNest Public Savings Ledger",
         investedAmount: isPersonal ? 900000 : 214000,
         currentValue: isPersonal ? 1125000 : 236800,
         sipAmount: isPersonal ? 18000 : 4500,
@@ -177,7 +177,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: pensionInstitution.id,
         ownerType: "SELF",
         assetClass: isPersonal ? "NPS" : "BOND",
-        name: isPersonal ? "Manan NPS Tier I" : "Civic Pension Desk Bond Ladder",
+        name: isPersonal ? "Personal NPS Tier I" : "Civic Pension Desk Bond Ladder",
         investedAmount: isPersonal ? 250000 : 156000,
         currentValue: isPersonal ? 330000 : 161900,
         sipAmount: isPersonal ? 5000 : 0,
@@ -202,7 +202,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: bankInstitution.id,
         ownerType: "FAMILY",
         assetClass: "SAVINGS",
-        name: isPersonal ? "Manan Family Savings" : "Riverbank Demo Operating Balance",
+        name: isPersonal ? "Personal Family Savings" : "Riverbank Demo Operating Balance",
         investedAmount: isPersonal ? 300000 : 42890,
         currentValue: isPersonal ? 300000 : 42890,
         liquidity: "HIGH",
@@ -229,7 +229,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: manualInstitution.id,
         ownerType: "FAMILY",
         assetClass: isPersonal ? "PHYSICAL_PLOT" : "VEHICLE",
-        name: isPersonal ? "Manan Residential Plot" : "Demo Electric Scooter",
+        name: isPersonal ? "Personal Residential Plot" : "Demo Electric Scooter",
         investedAmount: isPersonal ? 1200000 : 118000,
         currentValue: isPersonal ? 1750000 : 83500,
         liquidity: isPersonal ? "LOW" : "MEDIUM",
@@ -253,7 +253,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: insuranceInstitution.id,
         ownerType: "SELF",
         assetClass: isPersonal ? "LIC" : "ULIP",
-        name: isPersonal ? "Manan LIC Endowment Policy" : "LifeShield Sandbox Unit Plan",
+        name: isPersonal ? "Personal LIC Endowment Policy" : "LifeShield Sandbox Unit Plan",
         investedAmount: isPersonal ? 180000 : 65500,
         currentValue: isPersonal ? 220000 : 61240,
         sipAmount: isPersonal ? 5000 : 1100,
@@ -261,7 +261,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         taxCategory: "Insurance",
         metadata: isPersonal
           ? {
-              policyMasked: "LIC-MANAN",
+              policyMasked: "LIC-PERSONAL",
               sumAssured: 750000,
               premiumFrequency: "Annual",
               maturityValue: 550000
@@ -279,7 +279,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
         institutionId: bankInstitution.id,
         ownerType: "SELF",
         assetClass: isPersonal ? "RECURRING_DEPOSIT" : "FIXED_DEPOSIT",
-        name: isPersonal ? "Manan Monthly RD" : "Riverbank Demo Short FD",
+        name: isPersonal ? "Personal Monthly RD" : "Riverbank Demo Short FD",
         investedAmount: isPersonal ? 120000 : 37500,
         currentValue: isPersonal ? 124500 : 38360,
         sipAmount: isPersonal ? 10000 : undefined,
@@ -297,7 +297,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
       ownerType: "FAMILY",
       liabilityClass: isPersonal ? "HOME_LOAN" : "CAR_LOAN",
       lender: isPersonal ? "HDFC Bank" : "Riverbank Demo",
-      name: isPersonal ? "Manan Home Loan" : "Demo Vehicle Loan",
+      name: isPersonal ? "Personal Home Loan" : "Demo Vehicle Loan",
       originalAmount: isPersonal ? 5500000 : 420000,
       outstandingAmount: isPersonal ? 2500000 : 188500,
       emi: isPersonal ? 35000 : 8900,
@@ -407,7 +407,7 @@ async function seedPortfolio(userId: string, variant: PortfolioVariant) {
   await prisma.auditLog.create({
     data: {
       userId,
-      action: isPersonal ? "SEED_MANAN_PORTFOLIO" : "SEED_DEMO_PORTFOLIO",
+      action: isPersonal ? "SEED_PERSONAL_PORTFOLIO" : "SEED_DEMO_PORTFOLIO",
       entityType: "User",
       entityId: userId,
       metadata: { source: "prisma/seed.ts", variant }
@@ -426,13 +426,13 @@ async function main() {
   await seedPortfolio(demoUser.id, "demo");
 
   if (process.env.SEED_PERSONAL_USER === "true") {
-    const mananUser = await seedUser(
-      process.env.MANAN_USER_EMAIL ?? "manan@wealth.local",
-      "Manan",
-      process.env.MANAN_USER_PASSWORD ?? "manan123"
+    const personalUser = await seedUser(
+      process.env.PERSONAL_USER_EMAIL ?? "personal@wealth.local",
+      process.env.PERSONAL_USER_NAME ?? "Personal User",
+      process.env.PERSONAL_USER_PASSWORD ?? "password123"
     );
-    await seedPortfolio(mananUser.id, "personal");
-    console.log(`Seeded personal user ${mananUser.email}`);
+    await seedPortfolio(personalUser.id, "personal");
+    console.log(`Seeded personal user ${personalUser.email}`);
   }
 
   console.log(`Seeded demo user ${demoUser.email}`);
