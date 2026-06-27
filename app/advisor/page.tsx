@@ -11,6 +11,7 @@ type AdvisorJson = {
     title: string;
     category: string;
     priority: string;
+    decisionLabel?: string;
     rationale: string;
     action: string;
   }[];
@@ -52,7 +53,7 @@ export default async function AdvisorPage() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-bold">{item.title}</p>
-                    <p className="mt-1 text-xs uppercase tracking-wide text-stone-500">{item.category} · {item.priority}</p>
+                    <p className="mt-1 text-xs uppercase tracking-wide text-stone-500">{item.category} · {item.priority} · {item.decisionLabel ?? "review"}</p>
                   </div>
                 </div>
                 <p className="mt-3 text-sm text-stone-600">{item.rationale}</p>

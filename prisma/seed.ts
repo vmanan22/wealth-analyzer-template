@@ -14,6 +14,11 @@ async function main() {
   await prisma.session.deleteMany();
   await prisma.account.deleteMany();
   await prisma.verificationToken.deleteMany();
+  await prisma.advisorContextItem.deleteMany();
+  await prisma.marketQuote.deleteMany();
+  await prisma.instrument.deleteMany();
+  await prisma.syncRun.deleteMany();
+  await prisma.dataSource.deleteMany();
   await prisma.auditLog.deleteMany();
   await prisma.report.deleteMany();
   await prisma.aiInsight.deleteMany();
@@ -289,6 +294,41 @@ async function main() {
       status: "IMPORTED",
       mapping: { name: "name", currentValue: "current_value" }
     }
+  });
+
+  const dataSources = await Promise.all([
+    prisma.dataSource.create({ data: { userId: user.id, provider: "ZERODHA", name: "Zerodha", authType: "OAUTH", status: "CONFIG_REQUIRED", metadata: { note: "Use Kite Connect OAuth/API tokens or upload holdings CSV." } } }),
+    prisma.dataSource.create({ data: { userId: user.id, provider: "CAS", name: "CAS / CAMS / KFintech / MFCentral", authType: "FILE_UPLOAD", status: "NOT_CONNECTED", metadata: { note: "Upload CAS statement exports; no broker credentials required." } } }),
+    prisma.dataSource.create({ data: { userId: user.id, provider: "NSE", name: "NSE Market Context", authType: "LICENSED_FEED", status: "CONFIG_REQUIRED", metadata: { note: "Use licensed or permitted market feeds. Do not scrape NSE pages." } } }),
+    prisma.dataSource.create({ data: { userId: user.id, provider: "LAND_RECORDS", name: "Land / Real Estate", authType: "MANUAL", status: "NOT_CONNECTED", metadata: { note: "Use manual appraisals, circle rates, state portals, or future valuation providers." } } }),
+    prisma.dataSource.create({ data: { userId: user.id, provider: "ACCOUNT_AGGREGATOR", name: "Account Aggregator", authType: "CONSENT", status: "CONFIG_REQUIRED", metadata: { note: "Future RBI-regulated consent flow for bank/deposit data." } } })
+  ]);
+
+  await prisma.advisorContextItem.createMany({
+    data: [
+      {
+        userId: user.id,
+        dataSourceId: dataSources[2].id,
+        kind: "WARNING",
+        title: "NSE real-time feeds require permitted/licensed data",
+        source: "NSE",
+        asOfDate: new Date(),
+        confidence: 1,
+        staleness: "licensed_required",
+        payload: { guidance: "Use broker APIs or licensed vendors; do not scrape NSE pages.", decisionUse: "decision_support_only" }
+      },
+      {
+        userId: user.id,
+        dataSourceId: dataSources[3].id,
+        kind: "VALUATION_NOTE",
+        title: "Land values need manual or licensed valuation",
+        source: "Land / Real Estate",
+        asOfDate: new Date(),
+        confidence: 0.7,
+        staleness: "manual",
+        payload: { guidance: "Income Tax AIS may show historical transactions, not current market value.", decisionUse: "decision_support_only" }
+      }
+    ]
   });
 
   await prisma.auditLog.create({

@@ -1,0 +1,4 @@
+symbol,company_name,exchange,quantity,average_buy_price,invested_amount,current_price,current_value,sector,isin
+TCS,Tata Consultancy Services,NSE,10,3200,32000,3900,39000,IT,INE467B01029
+HDFCBANK,HDFC Bank,NSE,25,1450,36250,1680,42000,Banking,INE040A01034
+NIFTYBEES,Nippon India ETF Nifty BeES,NSE,50,225,11250,250,12500,ETF,INF204KB14I2

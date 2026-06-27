@@ -4,6 +4,9 @@ import { AssetClass, LiabilityClass, LiquidityCategory, OwnerType, Prisma } from
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { generateAdvisorResult } from "@/lib/advisor";
+import { ensureDefaultDataSources } from "@/lib/data-console";
+import { syncCasCsv } from "@/lib/integrations/kuvera";
+import { syncZerodhaCsv } from "@/lib/integrations/zerodha";
 import { prisma } from "@/lib/prisma";
 import { requireUserId } from "@/lib/auth";
 import { parseCsv, parseMoney, rowHash } from "@/lib/csv";
@@ -244,4 +247,59 @@ export async function createMonthlyReport() {
   await prisma.auditLog.create({ data: { userId, action: "CREATE_MONTHLY_REPORT", entityType: "Report", metadata: { type: "MONTHLY" } } });
   revalidatePath("/reports");
   redirect("/reports");
+}
+
+export async function initializeDataConsole() {
+  const userId = await requireUserId();
+  await ensureDefaultDataSources(userId);
+  await prisma.auditLog.create({ data: { userId, action: "INITIALIZE_DATA_CONSOLE", entityType: "DataSource" } });
+  revalidatePath("/data-console");
+}
+
+export async function importZerodhaHoldings(formData: FormData) {
+  const userId = await requireUserId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Zerodha holdings CSV is required.");
+  const result = await syncZerodhaCsv(userId, await file.text());
+  await prisma.auditLog.create({ data: { userId, action: "SYNC_ZERODHA_CSV", entityType: "DataSource", metadata: result } });
+  revalidatePath("/data-console");
+  revalidatePath("/assets");
+  redirect("/data-console");
+}
+
+export async function importCasHoldings(formData: FormData) {
+  const userId = await requireUserId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("CAS CSV is required.");
+  const result = await syncCasCsv(userId, await file.text());
+  await prisma.auditLog.create({ data: { userId, action: "SYNC_CAS_CSV", entityType: "DataSource", metadata: result } });
+  revalidatePath("/data-console");
+  revalidatePath("/assets");
+  redirect("/data-console");
+}
+
+export async function addNseLicensedFeedWarning() {
+  const userId = await requireUserId();
+  const source = await prisma.dataSource.upsert({
+    where: { userId_provider: { userId, provider: "NSE" } },
+    create: { userId, provider: "NSE", name: "NSE Market Context", authType: "LICENSED_FEED", status: "CONFIG_REQUIRED", metadata: { note: "Use licensed APIs or permitted public/index feeds. Do not scrape NSE pages." } },
+    update: { status: "CONFIG_REQUIRED", metadata: { note: "Use licensed APIs or permitted public/index feeds. Do not scrape NSE pages." } }
+  });
+  await prisma.advisorContextItem.create({
+    data: {
+      userId,
+      dataSourceId: source.id,
+      kind: "WARNING",
+      title: "NSE real-time market feed requires a permitted/licensed source",
+      source: "NSE",
+      asOfDate: new Date(),
+      confidence: 1,
+      staleness: "licensed_required",
+      payload: {
+        decisionUse: "decision_support_only",
+        guidance: "Do not scrape NSE pages in production. Use broker APIs, licensed vendors, or permitted public/index data."
+      }
+    }
+  });
+  revalidatePath("/data-console");
 }

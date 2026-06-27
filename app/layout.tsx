@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { BarChart3, Brain, FileText, Landmark, LineChart, PiggyBank, Settings, ShieldCheck, Target, Upload, WalletCards } from "lucide-react";
+import { BarChart3, Brain, DatabaseZap, FileText, Landmark, LineChart, PiggyBank, Settings, ShieldCheck, Target, Upload, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { SignOutButton } from "@/components/auth-buttons";
 import { getCurrentUser } from "@/lib/auth";
@@ -14,6 +14,7 @@ const nav = [
   { href: "/dashboard", label: "Dashboard", icon: BarChart3 },
   { href: "/assets", label: "Assets", icon: WalletCards },
   { href: "/liabilities", label: "Liabilities", icon: Landmark },
+  { href: "/data-console", label: "Data Console", icon: DatabaseZap },
   { href: "/imports", label: "Imports", icon: Upload },
   { href: "/snapshots", label: "Snapshots", icon: LineChart },
   { href: "/goals", label: "Goals", icon: Target },

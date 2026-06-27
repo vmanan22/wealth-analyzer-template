@@ -77,8 +77,20 @@ Sample files are available in `samples/`:
 - `sample-assets.csv`
 - `zerodha-holdings-sample.csv`
 - `bank-statement-sample.csv`
+- `zerodha-holdings-import.csv`
+- `cas-mf-import.csv`
 
 The generic importer expects columns such as `name`, `invested_amount`, `current_value`, and `transaction_date`. Rows can also include `assetClass`, `ownerType`, `platform`, `liquidity`, `taxCategory`, and `notes`.
+
+## Data Console
+
+Use `/data-console` to manage external portfolio feeds and advisor context.
+
+- Zerodha holdings CSV import maps stocks/ETFs into assets and advisor holding facts.
+- CAS/CAMS/KFintech/MFCentral CSV import maps mutual funds into assets and advisor MF facts.
+- NSE market context is represented as a licensed-feed placeholder. Do not scrape NSE pages in production.
+- LIC, EPFO, NPS, land/real estate, and Account Aggregator are modeled as future/manual/upload connectors.
+- Advisor context items always include source, as-of date, confidence, and staleness metadata.
 
 ## Privacy And Security
 
@@ -87,6 +99,7 @@ The generic importer expects columns such as `name`, `invested_amount`, `current
 - No secrets are exposed to the frontend.
 - No bank, Kuvera, Zerodha, or EPFO passwords are stored or requested.
 - AI analysis excludes credentials and is educational only, not SEBI-registered advice.
+- The public template defaults to decision-support only. It does not produce direct personalized buy/sell orders or target-price instructions.
 - Future integrations should use OAuth, API tokens, or consent-based Account Aggregator flows.
 - Export and delete-all-user-data controls are included in Settings.
 - Run `npm audit` before deployment; the committed dependency set is expected to report zero vulnerabilities.
@@ -95,6 +108,7 @@ The generic importer expects columns such as `name`, `invested_amount`, `current
 
 - Dedicated Kuvera/CAMS/KFintech CAS parser.
 - Zerodha Kite Connect OAuth integration for holdings and positions.
+- Licensed/permitted market data provider adapter for NSE quote context.
 - Account Aggregator consent flow for bank and financial data.
 - EPFO passbook and NPS CRA statement importers.
 - XIRR, CAGR, tax lot, and redeemable amount calculations.

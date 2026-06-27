@@ -79,6 +79,45 @@ enum TransactionType {
   ADJUSTMENT
 }
 
+enum DataSourceProvider {
+  ZERODHA
+  CAS
+  NSE
+  LIC
+  EPFO
+  NPS
+  LAND_RECORDS
+  ACCOUNT_AGGREGATOR
+  MANUAL
+}
+
+enum DataSourceStatus {
+  NOT_CONNECTED
+  CONNECTED
+  SYNCED
+  ERROR
+  CONFIG_REQUIRED
+}
+
+enum DataSourceAuthType {
+  OAUTH
+  API_TOKEN
+  FILE_UPLOAD
+  MANUAL
+  CONSENT
+  LICENSED_FEED
+}
+
+enum AdvisorContextKind {
+  HOLDING
+  MARKET_PRICE
+  MF_PORTFOLIO
+  DEBT_LIQUIDITY
+  VALUATION_NOTE
+  WARNING
+  CONNECTOR_STATUS
+}
+
 model User {
   id            String        @id @default(cuid())
   email         String        @unique
@@ -98,6 +137,10 @@ model User {
   imports       ImportBatch[]
   reports       Report[]
   aiInsights    AiInsight[]
+  dataSources    DataSource[]
+  syncRuns       SyncRun[]
+  instruments    Instrument[]
+  advisorContext AdvisorContextItem[]
   auditLogs     AuditLog[]
 }
 
@@ -279,6 +322,99 @@ model AiInsight {
   reports               Report[]
 
   @@index([userId, createdAt])
+}
+
+model DataSource {
+  id          String             @id @default(cuid())
+  userId      String
+  provider    DataSourceProvider
+  name        String
+  status      DataSourceStatus   @default(NOT_CONNECTED)
+  authType    DataSourceAuthType
+  lastSyncAt  DateTime?
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  syncRuns    SyncRun[]
+  contextItems AdvisorContextItem[]
+
+  @@unique([userId, provider])
+  @@index([userId, status])
+}
+
+model SyncRun {
+  id             String             @id @default(cuid())
+  userId         String
+  dataSourceId   String
+  provider       DataSourceProvider
+  status         DataSourceStatus
+  importedCount  Int                @default(0)
+  updatedCount   Int                @default(0)
+  warningCount   Int                @default(0)
+  errorMessage    String?
+  warnings       Json?
+  startedAt      DateTime           @default(now())
+  completedAt    DateTime?
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataSource     DataSource         @relation(fields: [dataSourceId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startedAt])
+  @@index([dataSourceId, startedAt])
+}
+
+model Instrument {
+  id          String             @id @default(cuid())
+  userId      String?
+  symbol      String?
+  isin        String?
+  name        String
+  exchange    String?
+  assetClass  AssetClass
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User?              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quotes      MarketQuote[]
+
+  @@index([userId, assetClass])
+  @@index([symbol])
+  @@index([isin])
+}
+
+model MarketQuote {
+  id           String   @id @default(cuid())
+  instrumentId String
+  price        Decimal  @db.Decimal(14, 4)
+  currency     String   @default("INR")
+  source       String
+  asOfDate     DateTime
+  metadata     Json?
+  createdAt    DateTime @default(now())
+  instrument   Instrument @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@index([instrumentId, asOfDate])
+  @@index([source, asOfDate])
+}
+
+model AdvisorContextItem {
+  id           String             @id @default(cuid())
+  userId       String
+  dataSourceId String?
+  kind         AdvisorContextKind
+  title        String
+  source       String
+  asOfDate     DateTime
+  confidence   Decimal            @db.Decimal(5, 2)
+  staleness    String
+  payload      Json
+  createdAt    DateTime           @default(now())
+  user         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dataSource   DataSource?        @relation(fields: [dataSourceId], references: [id], onDelete: SetNull)
+
+  @@index([userId, kind])
+  @@index([userId, asOfDate])
+  @@index([dataSourceId])
 }
 
 model Report {

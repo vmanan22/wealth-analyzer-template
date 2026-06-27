@@ -7,6 +7,7 @@ export type AdvisorRecommendation = {
   title: string;
   category: "allocation" | "debt" | "liquidity" | "goals" | "contributions" | "risk";
   priority: "high" | "medium" | "low";
+  decisionLabel?: "review" | "watch" | "rebalance candidate" | "concentration risk" | "insufficient data" | "discuss with advisor";
   rationale: string;
   action: string;
 };
@@ -20,6 +21,13 @@ export type AdvisorResult = {
 
 export async function buildAdvisorPayload() {
   const portfolio = await getPortfolioData();
+  const contextItems = await import("@/lib/prisma").then(({ prisma }) =>
+    prisma.advisorContextItem.findMany({
+      where: { userId: portfolio.userId },
+      orderBy: { asOfDate: "desc" },
+      take: 50
+    })
+  );
   return {
     summary: portfolio.summary,
     allocation: portfolio.allocation,
@@ -44,7 +52,21 @@ export async function buildAdvisorPayload() {
       outstandingAmount: toNumber(liability.outstandingAmount),
       emi: toNumber(liability.emi),
       interestRate: toNumber(liability.interestRate)
-    }))
+    })),
+    advisorContextFeed: contextItems.map((item) => ({
+      kind: item.kind,
+      title: item.title,
+      source: item.source,
+      asOfDate: item.asOfDate.toISOString(),
+      confidence: toNumber(item.confidence),
+      staleness: item.staleness,
+      payload: item.payload
+    })),
+    guardrails: {
+      mode: process.env.RIA_MODE === "true" ? "ria_mode_requested_but_not_enabled_in_public_template" : "decision_support_only",
+      prohibitedDefaultOutputs: ["direct buy order", "direct sell order", "guaranteed return", "target price instruction"],
+      allowedLabels: ["review", "watch", "rebalance candidate", "concentration risk", "insufficient data", "discuss with advisor"]
+    }
   };
 }
 
@@ -65,7 +87,7 @@ export async function generateAdvisorResult(): Promise<{ payload: Awaited<Return
         {
           role: "system",
           content:
-            "You are a careful Indian personal-finance portfolio analyst. Return only JSON matching this shape: { summary: string, riskScore: number, recommendations: [{ title, category, priority, rationale, action }], disclaimer: string }. Do not claim to be SEBI registered. Do not recommend specific securities as guaranteed winners."
+            "You are a careful Indian personal-finance portfolio analyst. Return only JSON matching this shape: { summary: string, riskScore: number, recommendations: [{ title, category, priority, decisionLabel, rationale, action }], disclaimer: string }. Default mode is decision-support only. Do not claim to be SEBI registered. Do not provide direct personalized buy/sell orders, guaranteed returns, or target-price instructions. Use labels like review, watch, rebalance candidate, concentration risk, insufficient data, or discuss with advisor."
         },
         {
           role: "user",
@@ -94,6 +116,7 @@ function normalizeAdvisorResult(value: Partial<AdvisorResult>): AdvisorResult {
       title: String(item.title ?? "Portfolio recommendation"),
       category: item.category ?? "risk",
       priority: item.priority ?? "medium",
+      decisionLabel: item.decisionLabel ?? "review",
       rationale: String(item.rationale ?? "Review this item before making changes."),
       action: String(item.action ?? "Discuss with a qualified advisor.")
     })) : [],
@@ -114,6 +137,7 @@ function buildRuleBasedAdvisor(payload: Awaited<ReturnType<typeof buildAdvisorPa
         title: "Review loan burden",
         category: "debt",
         priority: debtRatio > 40 ? "high" : "medium",
+        decisionLabel: "review",
         rationale: `Debt-to-asset ratio is ${debtRatio.toFixed(1)}%.`,
         action: "Compare incremental prepayment against expected investment returns and liquidity needs."
       },
@@ -121,6 +145,7 @@ function buildRuleBasedAdvisor(payload: Awaited<ReturnType<typeof buildAdvisorPa
         title: "Strengthen liquid buffer",
         category: "liquidity",
         priority: liquidRatio < 10 ? "high" : "medium",
+        decisionLabel: "watch",
         rationale: `Liquid assets are ${liquidRatio.toFixed(1)}% of total assets.`,
         action: "Maintain an emergency fund before increasing illiquid allocations."
       },
@@ -128,6 +153,7 @@ function buildRuleBasedAdvisor(payload: Awaited<ReturnType<typeof buildAdvisorPa
         title: "Track illiquid concentration",
         category: "allocation",
         priority: illiquidRatio > 45 ? "high" : "low",
+        decisionLabel: "concentration risk",
         rationale: `Illiquid assets are ${illiquidRatio.toFixed(1)}% of total assets.`,
         action: "Keep real estate, locked retirement assets, and insurance-linked assets visible in allocation reviews."
       }

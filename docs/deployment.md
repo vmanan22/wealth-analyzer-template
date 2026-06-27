@@ -58,5 +58,7 @@ For local prototype databases only, `npm run db:push` is acceptable.
 - Always run behind HTTPS in production.
 - Store OAuth and OpenAI keys in cloud secret stores.
 - Do not persist generated PDFs to local disk; generate on demand or add a future object-storage adapter.
+- Do not scrape exchange, bank, EPFO, LIC, or tax-portal websites. Use OAuth, consent, file upload, broker APIs, or licensed data feeds.
+- Keep connector access tokens encrypted or in a dedicated secrets vault before enabling live broker sync.
 - Enable automated managed PostgreSQL backups.
 - Rotate `NEXTAUTH_SECRET` only with a planned session invalidation window.
