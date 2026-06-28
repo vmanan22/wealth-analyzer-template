@@ -137,6 +137,9 @@ model User {
   imports       ImportBatch[]
   reports       Report[]
   aiInsights    AiInsight[]
+  aiConversations AiConversation[]
+  aiMessages     AiMessage[]
+  aiProviderConfigs AiProviderConfig[]
   dataSources    DataSource[]
   syncRuns       SyncRun[]
   instruments    Instrument[]
@@ -320,8 +323,57 @@ model AiInsight {
   createdAt             DateTime @default(now())
   user                  User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   reports               Report[]
+  conversations         AiConversation[]
 
   @@index([userId, createdAt])
+}
+
+model AiConversation {
+  id          String      @id @default(cuid())
+  userId      String
+  aiInsightId String?
+  title       String
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  aiInsight   AiInsight?  @relation(fields: [aiInsightId], references: [id], onDelete: SetNull)
+  messages    AiMessage[]
+
+  @@index([userId, updatedAt])
+  @@index([aiInsightId])
+}
+
+model AiMessage {
+  id             String         @id @default(cuid())
+  userId         String
+  conversationId String
+  role           String
+  content        String
+  reusedReasoning Boolean       @default(false)
+  metadata       Json?
+  createdAt      DateTime       @default(now())
+  user           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([conversationId, createdAt])
+}
+
+model AiProviderConfig {
+  id              String   @id @default(cuid())
+  userId          String
+  provider        String
+  model           String
+  encryptedApiKey String
+  apiKeyLast4     String?
+  isActive        Boolean  @default(false)
+  lastUsedAt      DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, provider])
+  @@index([userId, isActive])
 }
 
 model DataSource {

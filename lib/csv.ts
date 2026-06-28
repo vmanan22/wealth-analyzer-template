@@ -23,7 +23,10 @@ export function rowHash(row: CsvRow, keys: string[]) {
   return crypto.createHash("sha256").update(payload).digest("hex");
 }
 
-export function parseMoney(value?: string) {
+export function parseMoney(value?: string | number | null) {
   if (!value) return 0;
-  return Number(value.replace(/[₹,\s]/g, ""));
+  const normalized = String(value).replace(/[₹,\s,%]/g, "").replace(/^\((.*)\)$/, "-$1");
+  if (!normalized || normalized === "-") return 0;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : 0;
 }

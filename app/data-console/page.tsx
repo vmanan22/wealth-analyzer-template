@@ -1,4 +1,4 @@
-import { addNseLicensedFeedWarning, importCasHoldings, importZerodhaHoldings, initializeDataConsole } from "@/app/actions";
+import { addMarketIntelContext, addNseLicensedFeedWarning, importCasHoldings, importEpfoStatement, importLandValuation, importLicStatement, importNpsStatement, importZerodhaHoldings, initializeDataConsole } from "@/app/actions";
 import { Card, PageHeader, PrimaryButton } from "@/components/ui";
 import { getDataConsoleData } from "@/lib/data-console";
 
@@ -13,6 +13,8 @@ const connectorLabels: Record<string, string> = {
   ACCOUNT_AGGREGATOR: "Account Aggregator",
   MANUAL: "Manual"
 };
+
+const fileAccept = ".csv,.xlsx,.xls,.pdf,text/csv,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel";
 
 export default async function DataConsolePage() {
   const { sources, syncRuns, contextItems } = await getDataConsoleData();
@@ -46,18 +48,12 @@ export default async function DataConsolePage() {
           <Card>
             <h2 className="text-lg font-bold">First Tranche Imports</h2>
             <div className="mt-4 grid gap-4 md:grid-cols-2">
-              <form action={importZerodhaHoldings} className="rounded-md border border-stone-200 bg-stone-50 p-4">
-                <p className="font-bold">Zerodha holdings CSV</p>
-                <p className="mt-1 text-sm text-stone-500">Maps holdings into stock/ETF assets and advisor holding facts. Kite Connect OAuth can replace CSV later.</p>
-                <input className="mt-3" name="file" type="file" accept=".csv,text/csv" required />
-                <button className="mt-3 rounded-md bg-leaf px-4 py-2 text-sm font-semibold text-white">Import Zerodha</button>
-              </form>
-              <form action={importCasHoldings} className="rounded-md border border-stone-200 bg-stone-50 p-4">
-                <p className="font-bold">CAS mutual fund CSV</p>
-                <p className="mt-1 text-sm text-stone-500">Maps CAS/CAMS/KFintech/MFCentral exports into MF assets and advisor facts.</p>
-                <input className="mt-3" name="file" type="file" accept=".csv,text/csv" required />
-                <button className="mt-3 rounded-md bg-leaf px-4 py-2 text-sm font-semibold text-white">Import CAS</button>
-              </form>
+              <ConnectorUploadCard title="Zerodha holdings" action={importZerodhaHoldings} button="Import Zerodha" description="Maps holdings into stock/ETF assets and advisor holding facts. Kite Connect OAuth can replace file uploads later." helper="Supported columns include Instrument/Tradingsymbol, Qty., Avg. cost, LTP, Cur. val, ISIN, Exchange." />
+              <ConnectorUploadCard title="CAS mutual funds" action={importCasHoldings} button="Import CAS" description="Maps CAS/CAMS/KFintech/MFCentral exports into MF assets and advisor facts." helper="Use CAS, CAMS, KFintech, or MFCentral exports when available." />
+              <ConnectorUploadCard title="LIC policy statement" action={importLicStatement} button="Import LIC" description="Maps LIC policies into insurance assets and advisor valuation notes." helper="Best columns: policy name/number, premium paid, surrender/current value, maturity value." />
+              <ConnectorUploadCard title="EPFO passbook" action={importEpfoStatement} button="Import EPFO" description="Maps EPF balances into retirement assets and advisor context." helper="Best columns: description/name, employee/employer contribution, balance, closing balance." />
+              <ConnectorUploadCard title="NPS CRA statement" action={importNpsStatement} button="Import NPS" description="Maps NPS Tier balances into retirement assets and advisor context." helper="Best columns: scheme/fund, units, NAV, current value, PRAN/reference." />
+              <ConnectorUploadCard title="Land / real estate valuation" action={importLandValuation} button="Import Land" description="Maps land/property valuation files into physical plot assets." helper="Best columns: property/plot/location, valuation/current value, cost, valuation date." />
             </div>
           </Card>
 
@@ -66,6 +62,25 @@ export default async function DataConsolePage() {
             <p className="mt-2 text-sm text-stone-500">Production market feeds should use permitted APIs, licensed vendors, or broker APIs. This app does not scrape NSE pages.</p>
             <form action={addNseLicensedFeedWarning} className="mt-4">
               <button className="rounded-md border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-ink">Add licensed-feed warning to AI context</button>
+            </form>
+          </Card>
+
+          <Card>
+            <h2 className="text-lg font-bold">Manual Market Intel</h2>
+            <p className="mt-2 text-sm text-stone-500">Add trusted NSE/BSE, SEBI, RBI, AMFI, broker, vendor, or news context for the AI Advisor. Do not paste secrets or account data.</p>
+            <form action={addMarketIntelContext} className="mt-4 grid gap-3">
+              <input name="title" placeholder="Headline or fact" required />
+              <div className="grid gap-3 md:grid-cols-2">
+                <input name="sourceName" placeholder="Source name, e.g. NSE circular" required />
+                <input name="sourceType" placeholder="Source type, e.g. exchange / news / vendor" />
+              </div>
+              <textarea name="summary" rows={4} placeholder="Short summary for advisor context" required />
+              <div className="grid gap-3 md:grid-cols-3">
+                <input name="tags" placeholder="Tags: NIFTY, Banking, MF" />
+                <input name="url" placeholder="Reference URL" />
+                <input name="asOfDate" type="date" />
+              </div>
+              <button className="rounded-md bg-leaf px-4 py-2 text-sm font-semibold text-white">Add market intel</button>
             </form>
           </Card>
         </div>
@@ -109,5 +124,17 @@ export default async function DataConsolePage() {
         </Card>
       </div>
     </div>
+  );
+}
+
+function ConnectorUploadCard({ title, description, helper, action, button }: { title: string; description: string; helper: string; action: (formData: FormData) => void | Promise<void>; button: string }) {
+  return (
+    <form action={action} className="rounded-md border border-stone-200 bg-stone-50 p-4">
+      <p className="font-bold">{title}</p>
+      <p className="mt-1 text-sm text-stone-500">{description}</p>
+      <p className="mt-2 text-xs text-stone-500">{helper}</p>
+      <input className="mt-3" name="file" type="file" accept={fileAccept} required />
+      <button className="mt-3 rounded-md bg-leaf px-4 py-2 text-sm font-semibold text-white">{button}</button>
+    </form>
   );
 }

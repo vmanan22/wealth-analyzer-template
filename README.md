@@ -21,8 +21,9 @@ Wealth Analyzer is built to model that Indian household reality. It is not just 
 - Import generic CSV data with duplicate detection.
 - Import Zerodha holdings CSVs into stock/ETF assets and advisor context.
 - Import CAS/CAMS/KFintech/MFCentral-style mutual fund CSVs into MF assets and advisor context.
-- Use a Data Console to view connector status, sync history, and normalized facts passed to the AI Advisor.
-- Generate educational AI portfolio insights covering allocation, debt, SIPs, liquidity, goals, risk, and stale/missing data.
+- Use a Data Console to view connector status, sync history, manual market intel, and normalized facts passed to the AI Advisor.
+- Generate educational AI portfolio insights covering allocation, debt, SIPs, liquidity, goals, MF/stock review, risk, stale/missing data, and reasoning.
+- Challenge AI insights in an advisor chat; repeated “why?” questions can reuse stored reasoning before making another AI call.
 - Generate investor-style monthly reports and download them as PDFs.
 - Export user data and delete local user data from Settings.
 - Sign in with local credentials, create local users, or configure Google, Apple, and Facebook OAuth.
@@ -78,20 +79,29 @@ The Data Console is where external feeds become AI-ready context:
 - Land / real estate
 - Account Aggregator
 
-Each advisor context fact includes source, as-of date, confidence, staleness, and user ownership metadata.
+Each advisor context fact includes source, as-of date, confidence, staleness, and user ownership metadata. Manual trusted market intel can be added for NSE/BSE, SEBI, RBI, AMFI, broker/vendor, or news context without scraping.
 
 ### AI Advisor
 
-The AI Advisor reviews the portfolio and produces educational recommendations with labels such as:
+The AI Advisor supports OpenAI, Gemini, or Claude. Provider keys can be configured from the authenticated Settings screen, where they are encrypted before being stored in PostgreSQL. Environment variables still work as a cloud-secret fallback when no GUI key is active.
 
+Recommended first setup:
+
+1. Create a Gemini API key in [Google AI Studio](https://aistudio.google.com/app/apikey).
+2. In Settings, choose Gemini 2.5 Flash-Lite for the cheapest demo/development path, or Gemini 2.5 Flash for stronger reasoning.
+3. Save the key, open Advisor, and run Analyze portfolio.
+
+The advisor reviews the sanitized portfolio and produces educational recommendations with labels such as:
+
+- continue
 - review
 - watch
+- pause and reassess
 - rebalance candidate
-- concentration risk
 - insufficient data
 - discuss with advisor
 
-The default app does not generate direct buy/sell orders or target-price calls.
+Each recommendation stores a proposed move, reason, supporting data, tradeoffs, what would change the recommendation, and a plain-English explanation. The default app does not generate direct buy/sell orders or target-price calls.
 
 ### Reports
 
@@ -207,8 +217,13 @@ Important variables:
 - `APPLE_CLIENT_SECRET`
 - `FACEBOOK_CLIENT_ID`
 - `FACEBOOK_CLIENT_SECRET`
+- `AI_PROVIDER`
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
+- `GEMINI_API_KEY`
+- `GEMINI_MODEL`
+- `ANTHROPIC_API_KEY`
+- `ANTHROPIC_MODEL`
 
 All secrets should be stored in the target cloud's environment or secret manager.
 
@@ -244,7 +259,7 @@ Generic CSV imports support columns such as `name`, `invested_amount`, `current_
 - NPS CRA statement import.
 - LIC statement import.
 - Account Aggregator consent-based data flow.
-- Licensed market-data provider adapter for NSE/BSE context.
+- Automated licensed market-data provider adapter for NSE/BSE context.
 - XIRR, CAGR, tax-lot, and redeemable amount calculations.
 - Goal-to-asset mapping.
 - Object-storage adapter for generated report artifacts.

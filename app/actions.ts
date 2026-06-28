@@ -3,14 +3,16 @@
 import { AssetClass, LiabilityClass, LiquidityCategory, OwnerType, Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { generateAdvisorResult } from "@/lib/advisor";
+import { answerAdvisorChallenge, generateAdvisorResult } from "@/lib/advisor";
 import { ensureDefaultDataSources } from "@/lib/data-console";
-import { syncCasCsv } from "@/lib/integrations/kuvera";
-import { syncZerodhaCsv } from "@/lib/integrations/zerodha";
+import { syncCasFile } from "@/lib/integrations/kuvera";
+import { syncZerodhaFile } from "@/lib/integrations/zerodha";
+import { syncFileConnector } from "@/lib/integrations/file-connectors";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, requireUserId } from "@/lib/auth";
 import { parseCsv, parseMoney, rowHash } from "@/lib/csv";
 import { buildMonthlyReportContent } from "@/lib/reporting";
+import { encryptSecret, secretLast4 } from "@/lib/secret-vault";
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -255,8 +257,8 @@ export async function deleteAllUserData() {
 
 export async function generateAdvisorInsight() {
   const userId = await requireUserId();
-  const { payload, result, status } = await generateAdvisorResult();
-  await prisma.aiInsight.create({
+  const { payload, result, status } = await generateAdvisorResult(userId);
+  const insight = await prisma.aiInsight.create({
     data: {
       userId,
       portfolioSnapshotJson: payload,
@@ -265,9 +267,93 @@ export async function generateAdvisorInsight() {
       status
     }
   });
-  await prisma.auditLog.create({ data: { userId, action: "GENERATE_AI_INSIGHT", entityType: "AiInsight", metadata: { status, riskScore: result.riskScore } } });
+  await prisma.auditLog.create({ data: { userId, action: "GENERATE_AI_INSIGHT", entityType: "AiInsight", entityId: insight.id, metadata: { status, riskScore: result.riskScore, provider: result.provider, model: result.model } } });
   revalidatePath("/advisor");
   revalidatePath("/dashboard");
+  redirect("/advisor");
+}
+
+export async function saveAiProviderConfig(formData: FormData) {
+  const userId = await requireUserId();
+  const provider = formString(formData, "provider").toLowerCase();
+  const model = formString(formData, "model") || defaultModelForProvider(provider);
+  const apiKey = formString(formData, "apiKey");
+
+  if (!["openai", "gemini", "claude"].includes(provider)) {
+    redirect("/settings?ai=invalid-provider");
+  }
+
+  const existing = await prisma.aiProviderConfig.findUnique({
+    where: { userId_provider: { userId, provider } }
+  });
+
+  if (!apiKey && !existing) {
+    redirect("/settings?ai=missing-key");
+  }
+
+  await prisma.$transaction([
+    prisma.aiProviderConfig.updateMany({
+      where: { userId },
+      data: { isActive: false }
+    }),
+    prisma.aiProviderConfig.upsert({
+      where: { userId_provider: { userId, provider } },
+      create: {
+        userId,
+        provider,
+        model,
+        encryptedApiKey: encryptSecret(apiKey),
+        apiKeyLast4: secretLast4(apiKey),
+        isActive: true
+      },
+      update: {
+        model,
+        ...(apiKey ? { encryptedApiKey: encryptSecret(apiKey), apiKeyLast4: secretLast4(apiKey) } : {}),
+        isActive: true
+      }
+    }),
+    prisma.auditLog.create({
+      data: {
+        userId,
+        action: "SAVE_AI_PROVIDER_CONFIG",
+        entityType: "AiProviderConfig",
+        metadata: { provider, model, keyUpdated: Boolean(apiKey) }
+      }
+    })
+  ]);
+
+  revalidatePath("/settings");
+  revalidatePath("/advisor");
+  redirect("/settings?ai=saved");
+}
+
+export async function deleteAiProviderConfig(formData: FormData) {
+  const userId = await requireUserId();
+  const provider = formString(formData, "provider").toLowerCase();
+  await prisma.aiProviderConfig.deleteMany({ where: { userId, provider } });
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: "DELETE_AI_PROVIDER_CONFIG",
+      entityType: "AiProviderConfig",
+      metadata: { provider }
+    }
+  });
+  revalidatePath("/settings");
+  revalidatePath("/advisor");
+  redirect("/settings?ai=deleted");
+}
+
+export async function challengeAdvisorInsight(formData: FormData) {
+  const userId = await requireUserId();
+  const question = formString(formData, "question");
+  const insightId = formString(formData, "insightId") || undefined;
+  if (!question) {
+    redirect("/advisor");
+  }
+  const conversationId = await answerAdvisorChallenge(userId, question, insightId);
+  await prisma.auditLog.create({ data: { userId, action: "CHALLENGE_AI_INSIGHT", entityType: "AiConversation", entityId: conversationId } });
+  revalidatePath("/advisor");
   redirect("/advisor");
 }
 
@@ -290,6 +376,12 @@ export async function createMonthlyReport() {
   redirect("/reports");
 }
 
+function defaultModelForProvider(provider: string) {
+  if (provider === "gemini") return "gemini-2.5-flash-lite";
+  if (provider === "claude") return "claude-3-5-sonnet-latest";
+  return "gpt-4.1-mini";
+}
+
 export async function initializeDataConsole() {
   const userId = await requireUserId();
   await ensureDefaultDataSources(userId);
@@ -300,8 +392,8 @@ export async function initializeDataConsole() {
 export async function importZerodhaHoldings(formData: FormData) {
   const userId = await requireUserId();
   const file = formData.get("file");
-  if (!(file instanceof File)) throw new Error("Zerodha holdings CSV is required.");
-  const result = await syncZerodhaCsv(userId, await file.text());
+  if (!(file instanceof File)) throw new Error("Zerodha holdings file is required.");
+  const result = await syncZerodhaFile(userId, file);
   await prisma.auditLog.create({ data: { userId, action: "SYNC_ZERODHA_CSV", entityType: "DataSource", metadata: result } });
   revalidatePath("/data-console");
   revalidatePath("/assets");
@@ -311,9 +403,53 @@ export async function importZerodhaHoldings(formData: FormData) {
 export async function importCasHoldings(formData: FormData) {
   const userId = await requireUserId();
   const file = formData.get("file");
-  if (!(file instanceof File)) throw new Error("CAS CSV is required.");
-  const result = await syncCasCsv(userId, await file.text());
+  if (!(file instanceof File)) throw new Error("CAS statement file is required.");
+  const result = await syncCasFile(userId, file);
   await prisma.auditLog.create({ data: { userId, action: "SYNC_CAS_CSV", entityType: "DataSource", metadata: result } });
+  revalidatePath("/data-console");
+  revalidatePath("/assets");
+  redirect("/data-console");
+}
+
+export async function importLicStatement(formData: FormData) {
+  const userId = await requireUserId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("LIC statement file is required.");
+  const result = await syncFileConnector(userId, "LIC", file);
+  await prisma.auditLog.create({ data: { userId, action: "SYNC_LIC_FILE", entityType: "DataSource", metadata: result } });
+  revalidatePath("/data-console");
+  revalidatePath("/assets");
+  redirect("/data-console");
+}
+
+export async function importEpfoStatement(formData: FormData) {
+  const userId = await requireUserId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("EPFO statement file is required.");
+  const result = await syncFileConnector(userId, "EPFO", file);
+  await prisma.auditLog.create({ data: { userId, action: "SYNC_EPFO_FILE", entityType: "DataSource", metadata: result } });
+  revalidatePath("/data-console");
+  revalidatePath("/assets");
+  redirect("/data-console");
+}
+
+export async function importNpsStatement(formData: FormData) {
+  const userId = await requireUserId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("NPS statement file is required.");
+  const result = await syncFileConnector(userId, "NPS", file);
+  await prisma.auditLog.create({ data: { userId, action: "SYNC_NPS_FILE", entityType: "DataSource", metadata: result } });
+  revalidatePath("/data-console");
+  revalidatePath("/assets");
+  redirect("/data-console");
+}
+
+export async function importLandValuation(formData: FormData) {
+  const userId = await requireUserId();
+  const file = formData.get("file");
+  if (!(file instanceof File)) throw new Error("Land valuation file is required.");
+  const result = await syncFileConnector(userId, "LAND_RECORDS", file);
+  await prisma.auditLog.create({ data: { userId, action: "SYNC_LAND_FILE", entityType: "DataSource", metadata: result } });
   revalidatePath("/data-console");
   revalidatePath("/assets");
   redirect("/data-console");
@@ -343,4 +479,49 @@ export async function addNseLicensedFeedWarning() {
     }
   });
   revalidatePath("/data-console");
+}
+
+export async function addMarketIntelContext(formData: FormData) {
+  const userId = await requireUserId();
+  const title = formString(formData, "title");
+  const sourceName = formString(formData, "sourceName");
+  const sourceType = formString(formData, "sourceType") || "trusted_manual";
+  const summary = formString(formData, "summary");
+  const tags = formString(formData, "tags").split(",").map((tag) => tag.trim()).filter(Boolean);
+  const url = formString(formData, "url");
+  const asOfDate = optionalDate(formString(formData, "asOfDate")) ?? new Date();
+
+  if (!title || !sourceName || !summary) {
+    redirect("/data-console");
+  }
+
+  const source = await prisma.dataSource.upsert({
+    where: { userId_provider: { userId, provider: "MANUAL" } },
+    create: { userId, provider: "MANUAL", name: "Manual Market Intel", authType: "MANUAL", status: "SYNCED", lastSyncAt: new Date(), metadata: { note: "Manual trusted market/news context for AI Advisor." } },
+    update: { status: "SYNCED", lastSyncAt: new Date(), metadata: { note: "Manual trusted market/news context for AI Advisor." } }
+  });
+
+  await prisma.advisorContextItem.create({
+    data: {
+      userId,
+      dataSourceId: source.id,
+      kind: "WARNING",
+      title,
+      source: sourceName,
+      asOfDate,
+      confidence: 0.75,
+      staleness: "manual_trusted_context",
+      payload: {
+        sourceType,
+        summary,
+        tags,
+        url: url || null,
+        decisionUse: "advisor_context_only"
+      }
+    }
+  });
+  await prisma.auditLog.create({ data: { userId, action: "ADD_MARKET_INTEL_CONTEXT", entityType: "AdvisorContextItem", metadata: { sourceName, sourceType, tags } } });
+  revalidatePath("/data-console");
+  revalidatePath("/advisor");
+  redirect("/data-console");
 }

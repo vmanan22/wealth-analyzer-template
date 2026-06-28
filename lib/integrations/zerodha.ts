@@ -1,6 +1,7 @@
 import type { HoldingImportResult, PortfolioIntegration } from "@/lib/integrations/types";
 import { prisma } from "@/lib/prisma";
 import { parseCsv, parseMoney } from "@/lib/csv";
+import { parseImportFile, type ParsedImportFile } from "@/lib/import-file";
 import type { AssetClass } from "@prisma/client";
 
 export class ZerodhaCsvIntegration implements PortfolioIntegration {
@@ -15,45 +16,56 @@ export class ZerodhaCsvIntegration implements PortfolioIntegration {
   }
 }
 
-export async function syncZerodhaCsv(userId: string, csvText: string) {
-  const rows = parseCsv(csvText);
+export async function syncZerodhaCsv(userId: string, csvText: string, fileName = "zerodha-holdings.csv") {
+  return syncZerodhaRows(userId, { fileName, mode: "csv", rows: parseCsv(csvText), warnings: [] });
+}
+
+export async function syncZerodhaFile(userId: string, file: File) {
+  return syncZerodhaRows(userId, await parseImportFile(file));
+}
+
+async function syncZerodhaRows(userId: string, parsed: ParsedImportFile) {
   const source = await upsertDataSource(userId);
   const started = new Date();
-  const warnings: string[] = [];
+  const warnings: string[] = [...parsed.warnings];
   let importedCount = 0;
   let updatedCount = 0;
+  const rows = parsed.rows;
 
   for (const row of rows) {
-    const symbol = row.symbol || row.tradingsymbol || row.Symbol;
-    const name = row.company_name || row.name || row.instrument || symbol;
+    const rawSymbol = cell(row, ["symbol", "tradingsymbol", "trading symbol", "instrument", "scrip", "security", "name"]);
+    const symbol = normalizeSymbol(rawSymbol);
+    const name = cell(row, ["company_name", "company name", "name", "instrument", "scrip name", "security name"]) || symbol;
     if (!symbol || !name) {
       warnings.push("Skipped Zerodha row without symbol/name.");
       continue;
     }
-    const quantity = Number(row.quantity || row.qty || row.units || 0);
-    const averageBuyPrice = parseMoney(row.average_buy_price || row.average_price || row.avg_price);
-    const currentPrice = parseMoney(row.current_price || row.last_price || row.ltp);
-    const investedAmount = parseMoney(row.invested_amount) || quantity * averageBuyPrice;
-    const currentValue = parseMoney(row.current_value) || quantity * currentPrice || investedAmount;
-    const assetClass: AssetClass = String(row.instrument_type || row.assetClass || "").toUpperCase().includes("ETF") ? "ETF" : "STOCK";
+    const quantity = parseMoney(cell(row, ["quantity", "qty", "qty.", "units", "holding qty", "total qty"]));
+    const averageBuyPrice = parseMoney(cell(row, ["average_buy_price", "average price", "average_price", "avg_price", "avg. cost", "avg cost", "avg. price", "buy avg"]));
+    const currentPrice = parseMoney(cell(row, ["current_price", "current price", "last_price", "last price", "ltp", "market price"]));
+    const investedAmount = parseMoney(cell(row, ["invested_amount", "invested amount", "investment", "cost", "buy value"])) || quantity * averageBuyPrice;
+    const currentValue = parseMoney(cell(row, ["current_value", "current value", "cur. val", "cur val", "market value", "value"])) || quantity * currentPrice || investedAmount;
+    const exchange = cell(row, ["exchange", "segment"]) || "NSE";
+    const isin = cell(row, ["isin", "isin code"]);
+    const assetClass: AssetClass = inferAssetClass(row, symbol);
 
-    const existing = await prisma.asset.findFirst({ where: { userId, symbol } });
+    const existing = await prisma.asset.findFirst({ where: { userId, OR: [{ symbol }, ...(isin ? [{ metadata: { path: ["isin"], equals: isin } }] : [])] } });
     const asset = existing
       ? await prisma.asset.update({
           where: { id: existing.id },
-          data: { name, assetClass, platform: "Zerodha", units: quantity, currentPrice, investedAmount, currentValue, exchange: row.exchange || "NSE", sector: row.sector || existing.sector, metadata: { source: "zerodha_csv", isin: row.isin } }
+          data: { name, assetClass, platform: "Zerodha", units: quantity, currentPrice, investedAmount, currentValue, exchange, sector: cell(row, ["sector"]) || existing.sector, metadata: { source: "zerodha_csv", isin: isin || undefined, importedAt: new Date().toISOString() } }
         })
       : await prisma.asset.create({
-          data: { userId, ownerType: "SELF", assetClass, name, platform: "Zerodha", investedAmount, currentValue, units: quantity, currentPrice, liquidity: "HIGH", taxCategory: "Listed Equity", symbol, exchange: row.exchange || "NSE", sector: row.sector, metadata: { source: "zerodha_csv", isin: row.isin } }
+          data: { userId, ownerType: "SELF", assetClass, name, platform: "Zerodha", investedAmount, currentValue, units: quantity, currentPrice, liquidity: "HIGH", taxCategory: assetClass === "ETF" ? "ETF" : "Listed Equity", symbol, exchange, sector: cell(row, ["sector"]) || undefined, metadata: { source: "zerodha_csv", isin: isin || undefined, importedAt: new Date().toISOString() } }
         });
 
     if (existing) updatedCount += 1;
     else importedCount += 1;
 
     const instrument = await prisma.instrument.upsert({
-      where: { id: await findOrCreateInstrumentId(userId, symbol, row.isin, name, assetClass, row.exchange || "NSE") },
-      update: { name, isin: row.isin || undefined, symbol, exchange: row.exchange || "NSE", assetClass },
-      create: { userId, name, isin: row.isin || undefined, symbol, exchange: row.exchange || "NSE", assetClass }
+      where: { id: await findOrCreateInstrumentId(userId, symbol, isin, name, assetClass, exchange) },
+      update: { name, isin: isin || undefined, symbol, exchange, assetClass },
+      create: { userId, name, isin: isin || undefined, symbol, exchange, assetClass }
     });
 
     if (currentPrice) {
@@ -70,13 +82,29 @@ export async function syncZerodhaCsv(userId: string, csvText: string) {
         asOfDate: new Date(),
         confidence: 0.9,
         staleness: "fresh",
-        payload: { assetId: asset.id, symbol, name, quantity, averageBuyPrice, currentPrice, investedAmount, currentValue, decisionUse: "decision_support_only" }
+        payload: { assetId: asset.id, symbol, name, quantity, averageBuyPrice, currentPrice, investedAmount, currentValue, exchange, decisionUse: "decision_support_only" }
       }
     });
   }
 
+  if (!importedCount && !updatedCount && !warnings.length) {
+    warnings.push(`No holdings imported. Detected columns: ${Object.keys(rows[0] ?? {}).join(", ") || "none"}`);
+  }
+
+  await prisma.importBatch.create({
+    data: {
+      userId,
+      importType: "ZERODHA",
+      fileName: parsed.fileName,
+      rowCount: rows.length,
+      importedCount,
+      duplicateCount: 0,
+      status: warnings.length && !importedCount && !updatedCount ? "NEEDS_REVIEW" : "IMPORTED",
+      mapping: { warnings }
+    }
+  });
   await prisma.syncRun.create({ data: { userId, dataSourceId: source.id, provider: "ZERODHA", status: warnings.length ? "SYNCED" : "SYNCED", importedCount, updatedCount, warningCount: warnings.length, warnings, startedAt: started, completedAt: new Date() } });
-  await prisma.dataSource.update({ where: { id: source.id }, data: { status: "SYNCED", lastSyncAt: new Date(), metadata: { mode: "csv_or_mock", note: "Kite Connect OAuth can replace CSV input when credentials are configured." } } });
+  await prisma.dataSource.update({ where: { id: source.id }, data: { status: "SYNCED", lastSyncAt: new Date(), metadata: { mode: parsed.mode, note: "Kite Connect OAuth can replace file input when credentials are configured." } } });
   return { importedCount, updatedCount, warnings };
 }
 
@@ -93,4 +121,25 @@ async function findOrCreateInstrumentId(userId: string, symbol: string, isin: st
   if (existing) return existing.id;
   const created = await prisma.instrument.create({ data: { userId, symbol, isin: isin || undefined, name, assetClass, exchange } });
   return created.id;
+}
+
+function normalizedKey(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function cell(row: Record<string, string>, aliases: string[]) {
+  const entries = Object.entries(row);
+  const normalizedAliases = aliases.map(normalizedKey);
+  const match = entries.find(([key]) => normalizedAliases.includes(normalizedKey(key)));
+  return match?.[1]?.trim() ?? "";
+}
+
+function normalizeSymbol(value: string) {
+  return value.trim().replace(/^(NSE|BSE):/i, "").split(/\s+/)[0].toUpperCase();
+}
+
+function inferAssetClass(row: Record<string, string>, symbol: string): AssetClass {
+  const instrumentType = cell(row, ["instrument_type", "instrument type", "asset class", "type", "product"]);
+  const haystack = `${instrumentType} ${symbol}`.toUpperCase();
+  return /ETF|BEES|NIFTYETF|GOLDETF/.test(haystack) ? "ETF" : "STOCK";
 }
